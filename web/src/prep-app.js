@@ -56,21 +56,40 @@ function setStatus(text, frac = null) {
   if (frac != null) $("bar").style.width = `${Math.round(100 * frac)}%`;
 }
 
-async function analyze(site, username, rangeValue, timeClasses, mine) {
+/** One account's finished games (newest first), from whichever site it's on. */
+function fetchGames({ site, username }, range, timeClasses, status) {
+  return site === "lichess"
+    ? new Lichess({ store }).games(username, { range, timeClasses, onProgress: (n) => status(`${n}`) })
+    : new ChessCom({ store, minInterval: cfg.fetch.min_interval }).games(username, { range, timeClasses });
+}
+
+/** "dudacio" for one account or the same name on both sites; "dudacio / dud_lichess" otherwise. */
+const nameOf = (accounts) => [...new Map(accounts.map((a) => [a.username.toLowerCase(), a.username])).values()].join(" / ");
+
+/**
+ * accounts: [{site, username}], one person's accounts (a Chess.com one and a Lichess one, say). Their games are
+ * pooled into one tree; the range applies to each account.
+ */
+async function analyze(accounts, rangeValue, timeClasses, mine) {
   const run = {};
   state = { run };
-  const theirs = mine === "w" ? "b" : "w";
+  const theirs = mine === "w" ? "b" : "w", username = nameOf(accounts);
   $("error").hidden = true;
   $("report").hidden = true;
   document.body.dataset.view = "loading";
-  setStatus(`Fetching ${username}'s finished games from ${SITE_NAME[site]}…`, 0.1);
-  let games;
+  const games = [];
   try {
     names ??= await (await fetch(new URL("./openings.json", import.meta.url))).json();
-    games = site === "lichess"
-      ? await new Lichess({ store }).games(username, { range: parseRange(rangeValue), timeClasses,
-          onProgress: (n) => setStatus(`Fetching ${username}'s finished games from Lichess… ${n}`, 0.1) })
-      : await new ChessCom({ store, minInterval: cfg.fetch.min_interval }).games(username, { range: parseRange(rangeValue), timeClasses });
+    for (const [i, a] of accounts.entries()) {   // one at a time: each site has its own rate limits
+      const msg = `Fetching ${a.username}'s finished games from ${SITE_NAME[a.site]}…`;
+      setStatus(msg, (0.1 + i) / accounts.length);
+      try {
+        games.push(...await fetchGames(a, parseRange(rangeValue), timeClasses, (n) => setStatus(`${msg} ${n}`)));
+      } catch (e) {
+        throw new Error(accounts.length > 1 ? `${a.username} on ${SITE_NAME[a.site]}: ${e.message}` : e.message);
+      }
+      if (state.run !== run) return;
+    }
   } catch (e) {
     if (state.run !== run) return;
     setStatus("");
@@ -80,7 +99,9 @@ async function analyze(site, username, rangeValue, timeClasses, mine) {
     return;
   }
   if (state.run !== run) return;
-  const theirGames = games.filter((g) => g.color === theirs);
+  // Pooled newest first; a game seen twice (the same account entered twice) counts once.
+  const seen = new Set();
+  const theirGames = games.filter((g) => g.color === theirs && !seen.has(g.link) && seen.add(g.link)).sort((a, b) => b.endTime - a.endTime);
   if (!theirGames.length) {
     setStatus("");
     $("error").textContent = `No finished ${timeClasses.join("/") || ""} games where ${username} had ${COLOR[theirs]}. Try a longer range or more time controls.`;
@@ -88,12 +109,14 @@ async function analyze(site, username, rangeValue, timeClasses, mine) {
     document.body.dataset.view = "intro";
     return;
   }
-  await store.set("prep-last", { site, username, range: rangeValue, timeClasses, side: mine });
+  const [{ site, username: first }, also = null] = accounts;
+  await store.set("prep-last", { site, username: first, also, range: rangeValue, timeClasses, side: mine });
   const tree = buildTree(theirGames, { plies: P.plies, names });
   Object.assign(state, { tree, mine, theirs, username, site, node: tree.root, slips: new Map(), plans: null, plan: null });
   setStatus("");
   board.white = mine === "w";
-  $("who").textContent = `${username}${site === "lichess" ? " (Lichess)" : ""} as ${COLOR[theirs]} · ${theirGames.length} games`;
+  const where = accounts.length > 1 ? ` (${[...new Set(accounts.map((a) => SITE_NAME[a.site]))].join(" + ")})` : site === "lichess" ? " (Lichess)" : "";
+  $("who").textContent = `${username}${where} as ${COLOR[theirs]} · ${theirGames.length} games`;
   $("start").classList.remove("open");
   document.body.dataset.view = "report";
   $("report").hidden = false;
@@ -376,7 +399,7 @@ function selectTab(name) {
 
 async function main() {
   setupTheme();
-  const range = new Select($("range")), siteSel = new Select($("site"));
+  const range = new Select($("range")), siteSel = new Select($("site")), site2Sel = new Select($("site2"));
   fitHero();
   document.fonts?.ready.then(fitHero);
   new ResizeObserver(fitHero).observe(document.querySelector(".stage"));
@@ -389,11 +412,35 @@ async function main() {
     document.querySelector("input[name=tc][value=daily] + span").lastChild.textContent = site === "lichess" ? "Corresp." : "Daily";
   };
   $("site").addEventListener("change", paintSite);
+  // Their other account: a second site and username, pooled with the first.
+  const paintSite2 = () => { $("username2-label").textContent = `Their ${SITE_NAME[$("site2").value]} username`; };
+  const showAlso = (on) => {
+    $("also").hidden = !on;
+    $("btn-also").hidden = on;
+    $("range-label").textContent = on ? "Games, each" : "Games";
+    if (!on) $("username2").value = "";
+  };
+  $("site2").addEventListener("change", paintSite2);
+  $("btn-also").addEventListener("click", () => {
+    $("site2").value = $("site").value === "lichess" ? "chesscom" : "lichess";
+    site2Sel.sync();
+    paintSite2();
+    showAlso(true);
+    $("username2").focus();
+  });
+  $("btn-also-remove").addEventListener("click", () => { showAlso(false); $("btn-also").focus(); });
   const last = await store.get("prep-last");
   if (last) {
     $("site").value = last.site === "lichess" ? "lichess" : "chesscom";
     siteSel.sync();
     $("username").value = last.username;
+    if (last.also) {
+      $("site2").value = last.also.site === "lichess" ? "lichess" : "chesscom";
+      site2Sel.sync();
+      paintSite2();
+      showAlso(true);
+      $("username2").value = last.also.username;
+    }
     if ([...$("range").options].some((o) => o.value === last.range)) { $("range").value = last.range; range.sync(); }
     for (const box of document.querySelectorAll("input[name=tc]")) box.checked = last.timeClasses.includes(box.value);
     const side = document.querySelector(`input[name=side][value="${last.side}"]`);
@@ -420,7 +467,10 @@ async function main() {
     const username = $("username").value.trim();
     if (!username) return;
     const timeClasses = [...document.querySelectorAll("input[name=tc]:checked")].map((b) => b.value);
-    analyze($("site").value, username, $("range").value, timeClasses, sideNow());
+    const accounts = [{ site: $("site").value, username }];
+    const other = $("username2").value.trim();
+    if (!$("also").hidden && other) accounts.push({ site: $("site2").value, username: other });
+    analyze(accounts, $("range").value, timeClasses, sideNow());
   });
 }
 

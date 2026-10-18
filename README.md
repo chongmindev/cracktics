@@ -19,7 +19,8 @@ and schedules positions with spaced repetition (Leitner boxes).
 ## Match prep
 
 A second page, **https://chongmindev.github.io/cracktics/prep/**, prepares you for a game against one person.
-Give it their username and the colour you'll have; it reads their finished games and shows:
+Give it their username (and, if they have one, their account on the other site, pooled into one report) and
+the colour you'll have; it reads their finished games and shows:
 
 - **Game plan:** their habits that cost them, as full lines, best bets first (how likely they walk into it, times
   what it costs): your moves to get there, how often they follow, where they can go another way, their habit, and

@@ -96,3 +96,10 @@ svg.arrows g.yours polygon { fill: var(--accent); }
 .plan-back, .plan-tree { justify-self: start; }
 .road .off { margin: 2px 0 0; line-height: 1.6; }
 .road .off .link-btn { font-family: var(--f-mono); text-transform: none; letter-spacing: 0; }
+
+/* Their other account: a second site + username row, pooled with the first */
+.also-row { margin-top: 10px; }
+.also-row[hidden], .also-add[hidden] { display: none; }
+.also-remove { justify-self: start; align-self: end; min-height: 40px; }
+.also-add { display: block; margin-top: 8px; }
+.also-remove, .also-add { font: 500 0.75rem var(--f-mono); letter-spacing: var(--track-label); text-transform: uppercase; }

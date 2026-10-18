@@ -107,7 +107,7 @@
             <label class="field"><span class="label" id="username-label">Their Chess.com username</span>
               <input class="input" type="text" id="username" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="opponent's username" required>
             </label>
-            <label class="field"><span class="label">Games</span>
+            <label class="field"><span class="label" id="range-label">Games</span>
               <select id="range">
                 <optgroup label="Most recent">
                   <option value="g25">Last 25</option>
@@ -127,6 +127,19 @@
               </select>
             </label>
           </div>
+          <div class="form-row who-row also-row" id="also" hidden>
+            <label class="field site-field"><span class="label">Site</span>
+              <select id="site2" data-compact>
+                <option value="chesscom" data-icon="i-chesscom">Chess.com</option>
+                <option value="lichess" data-icon="i-lichess" selected>Lichess</option>
+              </select>
+            </label>
+            <label class="field"><span class="label" id="username2-label">Their Lichess username</span>
+              <input class="input" type="text" id="username2" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="their other account">
+            </label>
+            <button class="link-btn label also-remove" type="button" id="btn-also-remove">Remove</button>
+          </div>
+          <button class="link-btn label also-add" type="button" id="btn-also">+ Their other account</button>
           <div class="form-row tc" style="margin-top:14px">
             <fieldset class="seg" id="side">
               <legend class="label">You'll have</legend>
