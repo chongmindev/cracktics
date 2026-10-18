@@ -181,3 +181,17 @@ in the bar). Verdict colors: right = accent with a check, wrong = black with a c
 | React, Tailwind, lucide-react | CSS custom properties, one inline lucide icon | no framework or build step in this app |
 | `py-24`+ section padding, 8xl–9xl type everywhere | tight panel spacing, oversized type only in the hero | the brief is one screen with every main feature visible |
 | Pricing tiers, testimonials, blog images, drop cap | not used | this is an app, not a marketing page; the bold choices that apply are kept (oversized hero, rule with square, inverted band, 4px rules, zero radius, instant inversions, textures) |
+
+## Match prep (prep/index.html)
+
+Same frame, tokens and components as the drill; extra styles in `styles/prep.css`.
+
+| Part | Class | Notes |
+|---|---|---|
+| Tools nav | `.tools` | in the bar beside the wordmark: Drill, Prep; the current page underlined in ink. Under 420px the wordmark shows only the knight |
+| You'll have | `.seg` | White / Black as two joined buttons (pick one) |
+| Summary | `.prep-counters` | the inverted band: games, their score, how predictable, where they leave book |
+| Tabs | `.tabs` | Weak spots, Explorer, Habits; one pane at a time, scrolling inside the panel on desktop |
+| Rows | `.row` | a line or move, its opening name, a number, and their win / draw / loss as a 4px bar along the bottom (ink / accent-mid / hairline) |
+| Explorer | `.crumbs`, `.opening` | the line so far as clickable moves; arrows on the board for the next moves, heavier = more often; their moves in ink, yours in accent |
+| Habit check | `.slip-note`, `.tag.slip` | accent left rule on the tint; "Costs 1.2" tag in the habits list |

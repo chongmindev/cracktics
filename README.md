@@ -16,6 +16,19 @@ and schedules positions with spaced repetition (Leitner boxes).
 > **https://chongmindev.github.io/cracktics/** (source in [`web/`](web/)). The Python pipeline, MCP server
 > and single-file trainer below read Chess.com only.
 
+## Match prep
+
+A second page, **https://chongmindev.github.io/cracktics/prep/**, prepares you for a game against one person.
+Give it their username and the colour you'll have; it reads their finished games and shows:
+
+- **Weak spots:** lines you can steer into where they score well below their usual, and their results by opening.
+- **Explorer:** their opening tree from the start: what they play at each move, how often, and how they score,
+  with named openings (the Lichess opening list, CC0) and links to their latest games in that line.
+- **Habits:** positions they reach often and answer the same way, each checked with Stockfish; a habit that
+  gives something away is marked.
+
+The thresholds live in `[prep]` in `config.toml`; the analysis is `web/src/prep.js`.
+
 ## Requirements
 
 - [uv](https://docs.astral.sh/uv/) (Python 3.12+)
@@ -75,7 +88,8 @@ settings (request pacing, time classes).
 Only **finished** games are ever analysed. The fetcher reads Chess.com's monthly archives, which contain
 finished games only, and never calls the current-games endpoints. On Lichess the web app uses the games
 export with `ongoing=false`, which returns finished games only. Both sites ban engine assistance during
-games; this tool is for reviewing them afterwards.
+games; this tool is for reviewing them afterwards. Match prep studies an opponent's finished public games
+before you play them, which both sites allow; it is not for use during a game.
 
 ## Privacy
 

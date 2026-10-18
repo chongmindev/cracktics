@@ -28,6 +28,18 @@
   "trainer": {
     "fix_tolerance": 100
   },
+  "prep": {
+    "plies": 24,
+    "min_games": 3,
+    "weak_gap": 0.12,
+    "weak_spots": 6,
+    "family_min_games": 3,
+    "habit_min_games": 3,
+    "habit_min_share": 0.5,
+    "slip_loss": 80,
+    "slip_depth": 14,
+    "slip_max": 40
+  },
   "fetch": {
     "base_url": "https://api.chess.com/pub",
     "min_interval": 1.0,

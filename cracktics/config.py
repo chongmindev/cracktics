@@ -82,6 +82,21 @@ class DrillConfig:
 
 
 @dataclass(frozen=True)
+class PrepConfig:
+    """Match prep (web only): an opponent's opening tree, weak spots and habits."""
+    plies: int
+    min_games: int
+    weak_gap: float
+    weak_spots: int
+    family_min_games: int
+    habit_min_games: int
+    habit_min_share: float
+    slip_loss: int
+    slip_depth: int
+    slip_max: int
+
+
+@dataclass(frozen=True)
 class Config:
     engine: EngineConfig
     fetch: FetchConfig
@@ -90,6 +105,7 @@ class Config:
     report: ReportConfig
     summary: SummaryConfig
     drills: DrillConfig
+    prep: PrepConfig
 
 
 def _build(cls, table: dict, section: str):
@@ -116,4 +132,5 @@ def load(path: str | Path | None = None) -> Config:
         report=_build(ReportConfig, raw["report"], "report"),
         summary=_build(SummaryConfig, raw["summary"], "summary"),
         drills=_build(DrillConfig, raw["drills"], "drills"),
+        prep=_build(PrepConfig, raw["prep"], "prep"),
     )

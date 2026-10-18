@@ -489,3 +489,12 @@ svg.arrows polygon { fill: var(--ink); }
 .mini .tick { position: absolute; top: 6px; left: 6px; display: grid; place-items: center; width: 26px; height: 26px; font: 700 1rem/1 var(--f-mono); font-style: normal;
   background: var(--ok-bg); color: var(--ok-fg); animation: peek-tick 3.2s steps(1) infinite; }
 @keyframes peek-tick { 0% { opacity: 0; } 58% { opacity: 1; } }
+
+/* ---------- Tools nav in the bar: the drill and match prep ---------- */
+.bar-left { display: flex; align-items: center; gap: 22px; min-width: 0; }
+.tools { display: flex; gap: 14px; }
+.tools a { border: 0; padding: 4px 0; font: 500 0.75rem var(--f-mono); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-muted);
+  border-bottom: 2px solid transparent; }
+.tools a:hover { color: var(--ink); border-bottom-color: var(--accent); }
+.tools a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--ink); }
+@media (max-width: 420px) { .bar-left { gap: 12px; } .tools { gap: 10px; } .wordmark span { display: none; } }
