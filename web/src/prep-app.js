@@ -7,7 +7,7 @@ import { ChessCom } from "./chesscom.js";
 import { EnginePool, Evaluator } from "./evals.js";
 import { numbered, refutation } from "./explain.js";
 import { Lichess } from "./lichess.js";
-import { buildTree, byFamily, bookExit, family, habits, kidsOf, lineOf, numberLine, predictability, rankPlans, score, walk, weakSpots } from "./prep.js";
+import { buildTree, byFamily, bookExit, family, habits, kidsOf, lineOf, numberLine, predictability, rankPlans, walk, weakSpots } from "./prep.js";
 import { Select } from "./select.js";
 import { IdbStore, MemoryStore } from "./store.js";
 import { UciEngine } from "./uci.js";
@@ -22,6 +22,8 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const pct = (x) => `${Math.round(100 * x)}%`;
 const games = (n) => `${n} game${n === 1 ? "" : "s"}`;
+/** Their win rate in a node (draws aside; the W/D/L bar shows those). Every percentage on the page says what it counts. */
+const won = (nd) => (nd.n ? nd.w / nd.n : 0);
 
 let names = null, store = null, pool = null, board = null;
 let state = null;   // {tree, mine, theirs, username, site, node, slips: Map(node -> verdict), plans, plan, run}
@@ -107,7 +109,7 @@ async function analyze(site, username, rangeValue, timeClasses, mine) {
 function paintSummary() {
   const { tree, theirs } = state;
   $("r-games").textContent = tree.games;
-  $("r-score").textContent = pct(score(tree.root));
+  $("r-score").textContent = pct(won(tree.root));
   $("r-pred").textContent = pct(predictability(tree, theirs));
   const exit = bookExit(tree);
   $("r-book").textContent = exit ? `Move ${exit}` : "–";
@@ -118,17 +120,16 @@ function paintWeak() {
   const { tree, theirs, mine, username } = state;
   const spots = weakSpots(tree, theirs, { minGames: P.min_games, gap: P.weak_gap, max: P.weak_spots });
   const fams = byFamily(tree, { minGames: P.family_min_games });
-  const overall = score(tree.root);
   const rows = spots.map((s, i) => `<li><button type="button" class="row" data-weak="${i}">
       <span class="row-main"><b class="mono">${esc(lineText(s.node))}</b><span class="row-name">${esc(s.node.name || "Unnamed line")}</span></span>
-      <span class="row-side"><b>${pct(score(s.node))}</b><span class="label">${games(s.node.n)}</span></span>${wdl(s.node)}</button></li>`).join("");
+      <span class="row-side"><b>${pct(won(s.node))}</b><span class="label">they won · ${games(s.node.n)}</span></span>${wdl(s.node)}</button></li>`).join("");
   $("pane-weak").innerHTML =
-    `<p class="pane-intro">Lines you can steer into as ${COLOR[mine]} where ${esc(username)} scores well below their usual ${pct(overall)}.</p>` +
+    `<p class="pane-intro">Lines you can steer into as ${COLOR[mine]} where ${esc(username)} does much worse than usual. Overall they win ${pct(won(tree.root))} of these games; the % on each line is how many they won there.</p>` +
     (spots.length ? `<ol class="rows">${rows}</ol>`
       : `<p class="empty">No line with ${P.min_games}+ games where they do clearly worse. More games (a longer range or more time controls) may show some.</p>`) +
     (fams.length ? `<h3 class="label pane-head">By opening</h3><ol class="rows fams">` + fams.map((f, i) => `<li><button type="button" class="row" data-fam="${i}">
       <span class="row-main"><span class="row-name">${esc(f.family)}</span><span class="label">${esc(f.eco)}</span></span>
-      <span class="row-side"><b>${pct(f.score)}</b><span class="label">${games(f.n)}</span></span>${wdl(f)}</button></li>`).join("") + `</ol>` : "");
+      <span class="row-side"><b>${pct(f.n ? f.w / f.n : 0)}</b><span class="label">they won · ${games(f.n)}</span></span>${wdl(f)}</button></li>`).join("") + `</ol>` : "");
   $("pane-weak").onclick = (e) => {
     const b = e.target.closest("button.row");
     if (!b) return;
@@ -163,8 +164,8 @@ function goTo(nd) {
   const total = kids.reduce((s, k) => s + k.n, 0);
   const slip = state.slips.get(nd);
   const rows = kids.map((k) => `<li><button type="button" class="row" data-san="${esc(k.san)}">
-      <span class="row-main"><b class="mono">${esc(k.san)}</b><span class="row-name">${k.name && k.name !== nd.name ? esc(k.name) : ""}</span></span>
-      <span class="row-side"><b>${pct(k.n / total)}</b><span class="label">${games(k.n)}</span></span>${wdl(k)}</button></li>`).join("");
+      <span class="row-main"><b class="mono">${esc(k.san)}</b><span class="row-name">${k.name && k.name !== nd.name ? `${esc(k.name)} · ` : ""}they won ${pct(won(k))}</span></span>
+      <span class="row-side"><b>${pct(k.n / total)}</b><span class="label">played · ${games(k.n)}</span></span>${wdl(k)}</button></li>`).join("");
   const links = nd.links.slice(0, 3).map((l, i) => `<a href="${esc(l)}" target="_blank" rel="noopener">Game ${i + 1} ↗</a>`).join("");
   $("pane-tree").innerHTML =
     `<nav class="crumbs" aria-label="Line">${crumbs}</nav>` +
@@ -284,12 +285,12 @@ function paintPlans(error = null) {
   }
   if (!plans.length) {
     pane.innerHTML = intro + `<p class="empty">None of their habits${state.habits.length ? "" : " (none found yet)"} gives anything away. ` +
-      `The Weak spots tab has the lines where they score badly anyway.</p>`;
+      `The Weak spots tab has the lines where they do badly anyway.</p>`;
     return;
   }
   pane.innerHTML = intro + `<ol class="rows">` + plans.map((p, i) => `<li><button type="button" class="row" data-plan="${i}">
       <span class="row-main"><b class="mono">${esc(moveText(p.move))}?</b><span class="row-name">${esc(numberLine(lineOf(p.node)) || "From the first move")}${p.node.name ? ` · ${esc(family(p.node.name))}` : ""}</span></span>
-      <span class="row-side"><span class="tag slip">Costs ${(p.loss / 100).toFixed(1)}</span><span class="label" title="The chance they follow this road and play the habit, from their games">${pct(p.odds)} odds</span></span></button></li>`).join("") + `</ol>`;
+      <span class="row-side"><span class="tag slip">Costs ${(p.loss / 100).toFixed(1)}</span><span class="label" title="The chance they follow this road and play the habit, from their games">${pct(p.odds)} fall for it</span></span></button></li>`).join("") + `</ol>`;
   pane.onclick = (e) => { const b = e.target.closest("button.row"); if (b && plans[+b.dataset.plan].ready) openPlan(+b.dataset.plan); };
   pane.querySelectorAll("button.row").forEach((b) => { if (!plans[+b.dataset.plan].ready) b.querySelector(".row-side .label").textContent = "Working it out…"; });
 }
