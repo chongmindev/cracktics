@@ -103,3 +103,11 @@ svg.arrows g.yours polygon { fill: var(--accent); }
 .also-remove { justify-self: start; align-self: end; min-height: 40px; }
 .also-add { display: block; margin-top: 8px; }
 .also-remove, .also-add { font: 500 0.75rem var(--f-mono); letter-spacing: var(--track-label); text-transform: uppercase; }
+
+/* Stockfish's verdict on a move, beside it: quiet when fine, louder the more it gives away */
+.row-move { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.tag.best, .tag.good { padding-left: 0; color: var(--ink-muted); font-weight: 500; }
+.tag.dubious { border: 1px solid var(--ink-muted); color: var(--ink); }
+.tag.mistake { border: 1px solid var(--accent); color: var(--accent); }
+.tag.blunder { background: var(--accent); color: var(--paper); }
+.tag.wait { padding-left: 0; color: var(--ink-muted); font-weight: 500; }

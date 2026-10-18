@@ -91,9 +91,12 @@ class PrepConfig:
     family_min_games: int
     habit_min_games: int
     habit_min_share: float
+    dubious_loss: int
     slip_loss: int
+    blunder_loss: int
     slip_depth: int
-    slip_max: int
+    exploit_min_games: int
+    move_check_max: int
     plan_max: int
     plan_depth: int
     plan_loss_cap: int

@@ -185,3 +185,19 @@ export function rankPlans(slips, theirColor, { lossCap = 500 } = {}) {
     .map((p) => ({ ...p, value: p.odds * Math.min(p.loss, lossCap) }))
     .sort((a, b) => b.value - a.value);
 }
+
+/**
+ * Their moves worth checking with the engine: moves they made (their turn) at least minGames times in the tree,
+ * most played first, at most `max`. Each is a child node; its parent is the position they played it from.
+ */
+export function theirMoves(tree, theirColor, { minGames = 2, max = 60 } = {}) {
+  const out = [];
+  for (const nd of walk(tree.root)) if (nd.n >= minGames && nd.parent.fen.split(" ")[1] === theirColor) out.push(nd);
+  return out.sort((a, b) => b.n - a.n || a.ply - b.ply).slice(0, max);
+}
+
+/** A move's verdict from what it gives away (centipawns against the best move): best, good, dubious, mistake, blunder. */
+export function verdictOf(loss, { best = false, dubious = 50, mistake = 100, blunder = 250 } = {}) {
+  if (best) return "best";
+  return loss >= blunder ? "blunder" : loss >= mistake ? "mistake" : loss >= dubious ? "dubious" : "good";
+}

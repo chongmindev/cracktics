@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Chess } from "chess.js";
-import { buildTree, byFamily, habits, keyOf, kidsOf, lineOf, mainLine, numberLine, predictability, rankPlans, road, score, weakSpots } from "../src/prep.js";
+import { buildTree, byFamily, habits, keyOf, kidsOf, lineOf, mainLine, numberLine, predictability, rankPlans, road, score, theirMoves, verdictOf, weakSpots } from "../src/prep.js";
 
 /** A game seen from the opponent ("their" colour), from SAN moves. */
 function game(sans, color, result) {
@@ -55,4 +55,17 @@ test("road: their shares along the way, and the odds they follow it", () => {
   assert.equal(r.odds, (2 / 3) * (1 / 2));
   const plans = rankPlans([{ node: e5.kids.get("Nf3"), move: nc6, loss: 900 }, { node: e4, move: e5, loss: 100 }], "b", { lossCap: 500 });
   assert.deepEqual(plans.map((p) => p.move.san), ["Nc6", "e5"]);   // 1/3 * 500 > 2/3 * 100
+});
+
+test("theirMoves: their moves played often enough, most played first", () => {
+  const g = (moves) => ({ color: "b", result: "loss", moves });
+  const tree = buildTree([g(["e4", "e5", "Nf3", "Nc6"]), g(["e4", "e5", "Nf3", "Nc6"]), g(["e4", "c5"]), g(["d4", "d5"])]);
+  assert.deepEqual(theirMoves(tree, "b", { minGames: 2 }).map((n) => n.san), ["e5", "Nc6"]);
+  assert.deepEqual(theirMoves(tree, "b", { minGames: 1, max: 3 }).map((n) => n.san), ["e5", "Nc6", "c5"]);
+});
+
+test("verdictOf: thresholds, and the engine's own move is best", () => {
+  const t = { dubious: 50, mistake: 100, blunder: 250 };
+  assert.deepEqual([0, 49, 50, 100, 250].map((l) => verdictOf(l, t)), ["good", "good", "dubious", "mistake", "blunder"]);
+  assert.equal(verdictOf(0, { ...t, best: true }), "best");
 });

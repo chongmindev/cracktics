@@ -22,11 +22,13 @@ A second page, **https://chongmindev.github.io/cracktics/prep/**, prepares you f
 Give it their username (and, if they have one, their account on the other site, pooled into one report) and
 the colour you'll have; it reads their finished games and shows:
 
-- **Game plan:** their habits that cost them, as full lines, best bets first (how likely they walk into it, times
+- **Game plan:** moves they've made at least twice that give something away (Stockfish checks their 60 most
+  played), as full lines, best bets first (how likely they walk into it, times
   what it costs): your moves to get there, how often they follow, where they can go another way, their habit, and
   Stockfish's punishment, stepped on the board a move at a time with a line on what each move does.
 - **Weak spots:** lines you can steer into where they score well below their usual, and their results by opening.
-- **Explorer:** their opening tree from the start: what they play at each move, how often, and how they score,
+- **Explorer:** their opening tree from the start: what they play at each move, how often, how often they won
+  after it, and Stockfish's verdict on it (best, good, dubious, mistake, blunder, with what it gives away),
   with named openings (the Lichess opening list, CC0) and links to their latest games in that line.
 - **Habits:** positions they reach often and answer the same way, each checked with Stockfish; a habit that
   gives something away is marked.

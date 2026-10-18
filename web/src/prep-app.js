@@ -7,7 +7,7 @@ import { ChessCom } from "./chesscom.js";
 import { EnginePool, Evaluator } from "./evals.js";
 import { numbered, refutation } from "./explain.js";
 import { Lichess } from "./lichess.js";
-import { buildTree, byFamily, bookExit, family, habits, kidsOf, lineOf, numberLine, predictability, rankPlans, walk, weakSpots } from "./prep.js";
+import { buildTree, byFamily, bookExit, family, habits, kidsOf, lineOf, numberLine, predictability, rankPlans, theirMoves, verdictOf, walk, weakSpots } from "./prep.js";
 import { Select } from "./select.js";
 import { IdbStore, MemoryStore } from "./store.js";
 import { UciEngine } from "./uci.js";
@@ -26,7 +26,7 @@ const games = (n) => `${n} game${n === 1 ? "" : "s"}`;
 const won = (nd) => (nd.n ? nd.w / nd.n : 0);
 
 let names = null, store = null, pool = null, board = null;
-let state = null;   // {tree, mine, theirs, username, site, node, slips: Map(node -> verdict), plans, plan, run}
+let state = null;   // {tree, mine, theirs, username, site, node, judged: Map(move node -> {loss, bestSan}), plans, plan, run}
 
 async function openStore() {
   try { return await IdbStore.open(); } catch { return new MemoryStore(); }
@@ -112,7 +112,7 @@ async function analyze(accounts, rangeValue, timeClasses, mine) {
   const [{ site, username: first }, also = null] = accounts;
   await store.set("prep-last", { site, username: first, also, range: rangeValue, timeClasses, side: mine });
   const tree = buildTree(theirGames, { plies: P.plies, names });
-  Object.assign(state, { tree, mine, theirs, username, site, node: tree.root, slips: new Map(), plans: null, plan: null });
+  Object.assign(state, { tree, mine, theirs, username, site, node: tree.root, judged: new Map(), bests: new Map(), evaluate: null, check: null, plans: null, plan: null });
   setStatus("");
   board.white = mine === "w";
   const where = accounts.length > 1 ? ` (${[...new Set(accounts.map((a) => SITE_NAME[a.site]))].join(" + ")})` : site === "lichess" ? " (Lichess)" : "";
@@ -126,7 +126,7 @@ async function analyze(accounts, rangeValue, timeClasses, mine) {
   goTo(tree.root);
   selectTab("plan");
   paintPlans();
-  checkHabits(run);
+  checkMoves(run);
 }
 
 function paintSummary() {
@@ -175,7 +175,7 @@ function openInTree(nd) {
 }
 
 /** The explorer: the line so far (each move clickable), the opening's name, and the next moves they've seen here. */
-function goTo(nd) {
+function goTo(nd, { judge: wantJudge = true } = {}) {
   state.node = nd;
   const { theirs, username } = state;
   const kids = kidsOf(nd), theirTurn = nd.fen.split(" ")[1] === theirs;
@@ -185,25 +185,30 @@ function goTo(nd) {
     ? `<button type="button" class="crumb" data-ply="0">Start</button>`
     : `<button type="button" class="crumb" data-ply="${i}">${i % 2 === 1 ? `${(i + 1) / 2}.` : ""}${esc(x.san)}</button>`).join("");
   const total = kids.reduce((s, k) => s + k.n, 0);
-  const slip = state.slips.get(nd);
+  // Their costliest move here, if Stockfish has found one, and what was better.
+  const slip = theirTurn ? kids.filter((k) => (state.judged.get(k)?.loss ?? 0) >= P.slip_loss).sort((a, b) => b.n - a.n)[0] : null;
+  const sj = slip && state.judged.get(slip), planI = slip ? state.plans?.findIndex((p) => p.move === slip && p.w) ?? -1 : -1;
   const rows = kids.map((k) => `<li><button type="button" class="row" data-san="${esc(k.san)}">
-      <span class="row-main"><b class="mono">${esc(k.san)}</b><span class="row-name">${k.name && k.name !== nd.name ? `${esc(k.name)} · ` : ""}they won ${pct(won(k))}</span></span>
+      <span class="row-main"><span class="row-move"><b class="mono">${esc(k.san)}</b>${tagOf(k)}</span><span class="row-name">${k.name && k.name !== nd.name ? `${esc(k.name)} · ` : ""}they won ${pct(won(k))}</span></span>
       <span class="row-side"><b>${pct(k.n / total)}</b><span class="label">played · ${games(k.n)}</span></span>${wdl(k)}</button></li>`).join("");
   const links = nd.links.slice(0, 3).map((l, i) => `<a href="${esc(l)}" target="_blank" rel="noopener">Game ${i + 1} ↗</a>`).join("");
   $("pane-tree").innerHTML =
     `<nav class="crumbs" aria-label="Line">${crumbs}</nav>` +
     `<p class="opening"><span class="label">${esc(nd.eco || "")}</span> ${esc(nd.name || "Starting position")}</p>` +
     `<p class="pane-intro">${nd.n === 1 ? "One of their games" : `${nd.n} of their games`} reached this. ` +
-      (kids.length ? (theirTurn ? `<b>${esc(username)}</b> to move: what they played here.` : `Your move: what their opponents played, and how ${esc(username)} did.`)
+      (kids.length ? (theirTurn ? `<b>${esc(username)}</b> to move: what they played here.` : `Your move: what their opponents played, and how ${esc(username)} did.`) +
+        ` Each move: how often it was played, how often ${esc(username)} won after it, and Stockfish's verdict.`
         : "Their games go different ways from here.") + `</p>` +
-    (slip ? `<p class="slip-note"><b>Habit check:</b> ${slip.text}` +
-      (state.plans?.some((p) => p.node === nd && p.w) ? ` <button type="button" class="link-btn" data-plan-of>See the game plan</button>` : "") + `</p>` : "") +
+    (slip ? `<p class="slip-note"><b>Use this:</b> ${esc(username)} played <b>${esc(slip.san)}</b> here in ${slip.n} of ${nd.n} games, and it gives away ` +
+      `about ${(sj.loss / 100).toFixed(1)} pawns; <b>${esc(sj.bestSan)}</b> was best.` +
+      (planI >= 0 ? ` <button type="button" class="link-btn" data-plan-of="${planI}">See how to punish it</button>` : "") + `</p>` : "") +
     (kids.length ? `<ol class="rows">${rows}</ol>` : "") +
     (links ? `<p class="links label">Their latest games here: ${links}</p>` : "");
   $("pane-tree").onclick = (e) => {
     const c = e.target.closest(".crumb");
     if (c) return goTo(path[+c.dataset.ply]);
-    if (e.target.closest("[data-plan-of]")) return openPlan(state.plans.findIndex((p) => p.node === nd));
+    const po = e.target.closest("[data-plan-of]");
+    if (po) return openPlan(+po.dataset.planOf);
     const r = e.target.closest("button.row");
     if (r) goTo(nd.kids.get(r.dataset.san));
   };
@@ -211,74 +216,112 @@ function goTo(nd) {
   const arrows = kids.slice(0, 4).map((k) => ({ from: k.uci.slice(0, 2), to: k.uci.slice(2, 4), weight: k.n / total, kind: theirTurn ? "theirs" : "yours" }));
   const last = nd.uci ? { from: nd.uci.slice(0, 2), to: nd.uci.slice(2, 4) } : null;
   board.draw(nd.fen, { last, arrows });
+  if (wantJudge) judgeHere(nd);
 }
 
-/** Their habits (the same move most of the time), with the engine's verdict once checked. */
+/** Their habits (the same move most of the time), with Stockfish's verdict once checked. */
 function paintHabits() {
   const { tree, theirs, username } = state;
-  const list = habits(tree, theirs, { minGames: P.habit_min_games, minShare: P.habit_min_share });
-  state.habits = list;
-  const verdict = (h) => {
-    const v = state.slips.get(h.node);
-    if (!v) return `<span class="label">Checking…</span>`;
-    return v.slip ? `<span class="tag slip">Costs ${v.loss}</span>` : `<span class="label">Fine</span>`;
-  };
-  const sorted = [...list].sort((a, b) => (state.slips.get(b.node)?.slip ? 1 : 0) - (state.slips.get(a.node)?.slip ? 1 : 0));
+  const list = state.habits ??= habits(tree, theirs, { minGames: P.habit_min_games, minShare: P.habit_min_share });
+  const costly = (h) => (state.judged.get(h.move)?.loss ?? 0) >= P.slip_loss;
+  const sorted = [...list].sort((a, b) => costly(b) - costly(a));
   $("pane-habits").innerHTML =
-    `<p class="pane-intro">Positions ${esc(username)} reached at least ${P.habit_min_games} times and answered the same way most of the time. ` +
-      `Stockfish checks each: a habit that costs them is something to aim for.</p>` +
+    `<p class="pane-intro">Positions ${esc(username)} reached at least ${P.habit_min_games} times and answered the same way most of the time, ` +
+      `with Stockfish's verdict on that move. A habit that costs them is something to aim for.</p>` +
     (sorted.length ? `<ol class="rows">` + sorted.map((h) => `<li><button type="button" class="row" data-i="${list.indexOf(h)}">
-      <span class="row-main"><b class="mono">${esc(numberLine(lineOf(h.move)).split(" ").slice(-2).join(" "))}</b><span class="row-name">${esc(lineText(h.node))}</span></span>
-      <span class="row-side">${verdict(h)}<span class="label">${h.move.n} of ${h.node.n}</span></span></button></li>`).join("") + `</ol>`
+      <span class="row-main"><span class="row-move"><b class="mono">${esc(moveText(h.move))}</b>${tagOf(h.move)}</span><span class="row-name">${esc(lineText(h.node))}</span></span>
+      <span class="row-side"><b>${pct(h.share)}</b><span class="label">played · ${h.move.n} of ${h.node.n}</span></span></button></li>`).join("") + `</ol>`
       : `<p class="empty">No repeated choices yet. More games may show some.</p>`);
   $("pane-habits").onclick = (e) => { const b = e.target.closest("button.row"); if (b) openInTree(list[+b.dataset.i].node); };
 }
 
-/** Stockfish on their habits, most played first: how much their usual move gives away against the best move. */
-async function checkHabits(run) {
-  const list = state.habits.slice(0, P.slip_max);
-  if (!list.length) { state.plans = []; paintPlans(); return; }
+const WORD = { best: "Best", good: "Good", dubious: "Dubious", mistake: "Mistake", blunder: "Blunder" };
+
+/** Stockfish's verdict on a move as a tag ("Mistake −1.4"), or a placeholder while it's being checked. */
+function tagOf(k) {
+  const j = state.judged.get(k);
+  if (!j) return state.evaluate ? `<span class="tag wait" title="Stockfish hasn't looked at this move yet">…</span>` : "";
+  const v = verdictOf(j.loss, { best: j.best, dubious: P.dubious_loss, mistake: P.slip_loss, blunder: P.blunder_loss });
+  const cost = v === "best" || v === "good" ? "" : ` −${(j.loss / 100).toFixed(1)}`;
+  return `<span class="tag ${v}" title="Stockfish: ${j.best ? "its own choice" : `gives away about ${(j.loss / 100).toFixed(1)} pawns against ${esc(j.bestSan)}`}">${WORD[v]}${cost}</span>`;
+}
+
+/** "e5" for a UCI move from a position. */
+function sanOf(fen, uci) {
+  try { return new Chess(fen).move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] }).san; } catch { return null; }
+}
+
+/** The engine's best move and eval in a position (one search per position, shared). */
+function bestOf(nd) {
+  if (!state.bests.has(nd)) state.bests.set(nd, state.evaluate(nd.fen, P.slip_depth, 1).then(([b]) => ({ ...b, san: b?.move ? sanOf(nd.fen, b.move) : null })));
+  return state.bests.get(nd);
+}
+
+/** Judge one move: what it gives away against the engine's best from the position it was played in. */
+async function judge(k) {
+  if (state.judged.has(k)) return state.judged.get(k);
+  const run = state.run, nd = k.parent, best = await bestOf(nd);
+  if (!best?.move) return null;
+  let j;
+  if (best.san === k.san) j = { loss: 0, best: true, bestSan: best.san };
+  else {
+    const [after] = await state.evaluate(k.fen, P.slip_depth, 1);
+    if (!after) return null;   // mate or stalemate on the board: nothing to search
+    const sign = nd.fen.split(" ")[1] === "w" ? 1 : -1;
+    j = { loss: Math.max(0, sign * (best.cp - after.cp)), best: false, bestSan: best.san };
+  }
+  if (state.run === run) state.judged.set(k, j);
+  return j;
+}
+
+/** In the explorer, every move shown gets a verdict as soon as it's open (cached, so revisits are instant). */
+async function judgeHere(nd) {
+  if (!state.evaluate || !nd.kids.size) return;
+  const run = state.run;
+  await Promise.all([...nd.kids.values()].map((k) => judge(k).catch(() => null)));
+  if (state.run === run && state.node === nd && !$("pane-tree").hidden) goTo(nd, { judge: false });
+}
+
+/**
+ * Stockfish on their moves: every move they made at least exploit_min_games times (most played first, capped), and
+ * their habits. A move that gives away slip_loss or more becomes a game plan.
+ */
+async function checkMoves(run) {
   try {
     if (!pool) {
       const engines = await Promise.all(Array.from({ length: poolSize() }, () =>
         new UciEngine(workerTransport(ENGINE_URL), { mateScore: cfg.engine.mate_score }).init({ Hash: 16 })));
       pool = new EnginePool(engines);
     }
-  } catch { state.plans = []; paintPlans("Stockfish didn't start in this browser, so their habits can't be checked."); return; }
-  const evaluate = new Evaluator({ store, pool }).forGame();
-  const sign = state.theirs === "w" ? 1 : -1;
-  let done = 0;
-  $("note").textContent = `Checking their habits with Stockfish… 0/${list.length}`;
-  await Promise.all(list.map(async (h) => {
-    const [best] = await evaluate(h.node.fen, P.slip_depth, 1);
-    const [after] = await evaluate(h.move.fen, P.slip_depth, 1);
+  } catch { state.plans = []; paintPlans("Stockfish didn't start in this browser, so their moves can't be checked."); return; }
+  state.evaluate = new Evaluator({ store, pool }).forGame();
+  const list = [...new Set([...theirMoves(state.tree, state.theirs, { minGames: P.exploit_min_games, max: P.move_check_max }),
+    ...state.habits.map((h) => h.move)])];
+  state.check = { done: 0, all: list.length };
+  $("note").textContent = `Checking their moves with Stockfish… 0/${list.length}`;
+  goTo(state.node);
+  paintPlans();
+  await Promise.all(list.map(async (k) => {
+    try { await judge(k); } catch {}
     if (state.run !== run) return;
-    const loss = Math.max(0, sign * (best.cp - after.cp));
-    const bestSan = best.move ? new Chess(h.node.fen).move({ from: best.move.slice(0, 2), to: best.move.slice(2, 4), promotion: best.move[4] }).san : null;
-    const pawns = (loss / 100).toFixed(1);
-    const slip = loss >= P.slip_loss && bestSan !== h.move.san;
-    state.slips.set(h.node, { slip, loss: pawns, cp: loss, bestSan, text: slip
-      ? `${esc(state.username)} plays <b>${esc(h.move.san)}</b> here ${h.move.n} of ${h.node.n} times. Stockfish: it gives away about ${pawns} pawns; <b>${esc(bestSan)}</b> is best.`
-      : `${esc(state.username)} usually plays <b>${esc(h.move.san)}</b> here (${h.move.n} of ${h.node.n}), and Stockfish agrees it's fine.` });
-    $("note").textContent = `Checking their habits with Stockfish… ${++done}/${list.length}`;
+    $("note").textContent = `Checking their moves with Stockfish… ${++state.check.done}/${list.length}`;
     paintPlans();
   }));
   if (state.run !== run) return;
-  const slips = [...state.slips.values()].filter((v) => v.slip).length;
-  $("note").textContent = `Habits checked: ${slips} cost${slips === 1 ? "s" : ""} them something.`;
+  const slips = list.filter((k) => (state.judged.get(k)?.loss ?? 0) >= P.slip_loss);
+  $("note").textContent = `Checked ${list.length} of their moves: ${slips.length} give${slips.length === 1 ? "s" : ""} something away.`;
   paintHabits();
-  goTo(state.node);
-  await buildPlans(run);
+  if (!$("pane-tree").hidden) goTo(state.node);
+  await buildPlans(run, slips);
 }
 
 
-// ---------- game plans: the full line against a costly habit ----------
+// ---------- game plans: the full line against a costly move ----------
 
-/** The costly habits as plans, best bets first, each with the engine's punishing line once it's worked out. */
-async function buildPlans(run) {
-  const slips = state.habits.filter((h) => state.slips.get(h.node)?.slip)
-    .map((h) => ({ node: h.node, move: h.move, loss: state.slips.get(h.node).cp }));
-  state.plans = rankPlans(slips, state.theirs, { lossCap: P.plan_loss_cap }).slice(0, P.plan_max);
+/** Their costly moves as plans, best bets first, each with the engine's punishing line once it's worked out. */
+async function buildPlans(run, slips) {
+  state.plans = rankPlans(slips.map((k) => ({ node: k.parent, move: k, loss: state.judged.get(k).loss })), state.theirs,
+    { lossCap: P.plan_loss_cap }).slice(0, P.plan_max);
   paintPlans();
   await Promise.all(state.plans.map(async (p) => {
     let line = null;
@@ -289,6 +332,7 @@ async function buildPlans(run) {
     if (!state.plan) paintPlans();
   }));
   if (state.run === run && !state.plan) paintPlans();
+  if (state.run === run && !$("pane-tree").hidden) goTo(state.node, { judge: false });
 }
 
 /** "3…Bg4" for the move that led to a node. */
@@ -298,16 +342,15 @@ const moveText = (nd) => `${Math.ceil(nd.ply / 2)}${nd.ply % 2 ? "." : "…"}${n
 function paintPlans(error = null) {
   if (state.plan) return;
   const { plans, username, mine } = state, pane = $("pane-plan");
-  const intro = `<p class="pane-intro">Lines where a habit of ${esc(username)}'s costs them, best bets first: how likely they are to walk into it, ` +
-    `times what it costs. Each plan is the full line as ${COLOR[mine]}: your moves to get there, their habit, and how to punish it.</p>`;
+  const intro = `<p class="pane-intro">Moves ${esc(username)} has made at least ${P.exploit_min_games} times that give something away, best bets first: ` +
+    `how likely they are to walk into it, times what it costs. Each plan is the full line as ${COLOR[mine]}: your moves to get there, their move, and how to punish it.</p>`;
   if (error) { pane.innerHTML = intro + `<p class="empty">${esc(error)}</p>`; return; }
   if (!plans) {
-    const checked = [...state.slips.keys()].length, all = Math.min(state.habits?.length ?? 0, P.slip_max);
-    pane.innerHTML = intro + `<p class="walk-wait">Checking their habits with Stockfish… ${checked}/${all}</p>`;
+    pane.innerHTML = intro + `<p class="walk-wait">Checking their moves with Stockfish…${state.check ? ` ${state.check.done}/${state.check.all}` : ""}</p>`;
     return;
   }
   if (!plans.length) {
-    pane.innerHTML = intro + `<p class="empty">None of their habits${state.habits.length ? "" : " (none found yet)"} gives anything away. ` +
+    pane.innerHTML = intro + `<p class="empty">None of the moves they make often gives anything away. ` +
       `The Weak spots tab has the lines where they do badly anyway.</p>`;
     return;
   }
