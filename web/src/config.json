@@ -38,7 +38,10 @@
     "habit_min_share": 0.5,
     "slip_loss": 80,
     "slip_depth": 14,
-    "slip_max": 40
+    "slip_max": 40,
+    "plan_max": 8,
+    "plan_depth": 18,
+    "plan_loss_cap": 500
   },
   "fetch": {
     "base_url": "https://api.chess.com/pub",

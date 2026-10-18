@@ -21,6 +21,9 @@ and schedules positions with spaced repetition (Leitner boxes).
 A second page, **https://chongmindev.github.io/cracktics/prep/**, prepares you for a game against one person.
 Give it their username and the colour you'll have; it reads their finished games and shows:
 
+- **Game plan:** their habits that cost them, as full lines, best bets first (how likely they walk into it, times
+  what it costs): your moves to get there, how often they follow, where they can go another way, their habit, and
+  Stockfish's punishment, stepped on the board a move at a time with a line on what each move does.
 - **Weak spots:** lines you can steer into where they score well below their usual, and their results by opening.
 - **Explorer:** their opening tree from the start: what they play at each move, how often, and how they score,
   with named openings (the Lichess opening list, CC0) and links to their latest games in that line.

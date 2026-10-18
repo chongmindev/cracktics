@@ -188,6 +188,7 @@ Same frame, tokens and components as the drill; extra styles in `styles/prep.css
 
 | Part | Class | Notes |
 |---|---|---|
+| Game plan | `.road`, `.plan-walk` | first tab. A list of plans (costly habit, its road, "Costs N", odds), then one plan: the road as chips (your moves in accent, theirs with how often), where they can go another way, then the punishment as `.walk-steps` rows like the drill's idea. The board shows the next move as an arrow; Next move steps through road, habit and line |
 | Tools nav | `.tools` | in the bar beside the wordmark: Drill, Prep; the current page underlined in ink. Under 420px the wordmark shows only the knight |
 | You'll have | `.seg` | White / Black as two joined buttons (pick one) |
 | Summary | `.prep-counters` | the inverted band: games, their score, how predictable, where they leave book |

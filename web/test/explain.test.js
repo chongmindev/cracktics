@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { between, walkthrough, punishment } from "../src/explain.js";
+import { between, walkthrough, punishment, refutation } from "../src/explain.js";
 
 const plain = (s) => s.replace(/<[^>]+>/g, "");
 const SCHOLAR = "r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3";   // Black to move, f7 under fire
@@ -62,4 +62,19 @@ test("punishment: an opened line, and a quiet follow-up shows just the move", ()
   const w = punishment({ after, reply: "Qxf2", before, played: "Qb4" });
   assert.equal(w.reason, "Your queen on c5 was in the queen's way; <b>Qb4</b> opened the line to f2.");
   assert.equal(w.steps.length, 1);
+});
+
+test("refutation: what their habit gives you, then your reply and the line", () => {
+  const before = "rnbqkbnr/ppp1pppp/3p4/8/4P3/5Q2/PPPP1PPP/RNB1KBNR b KQkq - 1 2";   // 1.e4 d6 2.Qf3, Black to move
+  const w = refutation({ before, habit: "Bg4", line: { pv: ["f3g4", "e7e5"], cp: 320 } });
+  assert.equal(plain(w.reason), "Their bishop goes to g4, where your queen takes it, and nothing defends it.");
+  assert.deepEqual(w.steps.map((s) => s.ply.move.san), ["Bg4", "Qxg4", "e5"]);
+  assert.equal(w.steps[1].text, "You take the bishop.");
+  assert.equal(w.summary, "You come out a piece up.");
+});
+
+test("refutation: a habit that allows mate", () => {
+  const w = refutation({ before: SCHOLAR, habit: "Nf6", line: { pv: ["h5f7"], mate: 1 } });
+  assert.equal(plain(w.reason), "Allows Qxf7#, mate.");
+  assert.equal(w.summary, "Mate in 1.");
 });

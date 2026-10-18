@@ -149,7 +149,7 @@
       <ol class="how" aria-label="How it works">
         <li><h2>Fetch</h2><span class="label">Their finished games</span></li>
         <li><h2>Map</h2><span class="label">Every opening</span></li>
-        <li><h2>Prepare</h2><span class="label">Aim at weak spots</span></li>
+        <li><h2>Prepare</h2><span class="label">Punish their habits</span></li>
       </ol>
 
       <div class="status" id="status" hidden aria-live="polite">
@@ -165,11 +165,13 @@
           <div class="counter" title="On average, the move where their games leave the named openings"><b id="r-book">–</b><span class="label">Leaves book</span></div>
         </div>
         <div class="tabs" role="tablist" aria-label="Report">
-          <button role="tab" type="button" id="tab-weak" aria-controls="pane-weak" aria-selected="true">Weak spots</button>
+          <button role="tab" type="button" id="tab-plan" aria-controls="pane-plan" aria-selected="true">Game plan</button>
+          <button role="tab" type="button" id="tab-weak" aria-controls="pane-weak" aria-selected="false">Weak spots</button>
           <button role="tab" type="button" id="tab-tree" aria-controls="pane-tree" aria-selected="false">Explorer</button>
           <button role="tab" type="button" id="tab-habits" aria-controls="pane-habits" aria-selected="false">Habits</button>
         </div>
-        <div class="pane" role="tabpanel" id="pane-weak" aria-labelledby="tab-weak"></div>
+        <div class="pane" role="tabpanel" id="pane-plan" aria-labelledby="tab-plan"></div>
+        <div class="pane" role="tabpanel" id="pane-weak" aria-labelledby="tab-weak" hidden></div>
         <div class="pane" role="tabpanel" id="pane-tree" aria-labelledby="tab-tree" hidden></div>
         <div class="pane" role="tabpanel" id="pane-habits" aria-labelledby="tab-habits" hidden></div>
       </div>

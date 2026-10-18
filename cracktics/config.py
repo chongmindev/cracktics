@@ -94,6 +94,9 @@ class PrepConfig:
     slip_loss: int
     slip_depth: int
     slip_max: int
+    plan_max: int
+    plan_depth: int
+    plan_loss_cap: int
 
 
 @dataclass(frozen=True)

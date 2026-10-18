@@ -78,3 +78,6 @@ habit_min_share = 0.5     # ...and played the same move in at least this share o
 slip_loss = 80            # centipawns their usual move gives away, by the engine, to count as a slip
 slip_depth = 14
 slip_max = 40             # habits checked with the engine, most played first
+plan_max = 8              # game plans shown: their costliest habits, as full lines
+plan_depth = 18           # engine depth for the punishing line of each plan
+plan_loss_cap = 500       # in ranking plans, a habit costing more than this counts as this (a lost game is a lost game)

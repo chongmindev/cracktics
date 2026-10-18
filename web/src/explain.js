@@ -228,3 +228,55 @@ export function punishment({ after, reply, before = null, played = null, line = 
     : `Material stays level, but ${Opp} is much better.`;
   return { reason, idea, steps: idea ? steps : steps.slice(0, 1), summary };
 }
+
+/**
+ * How to punish an opponent's habit, from your side, in the same shape as walkthrough(): {reason, idea, steps, summary}.
+ * before: FEN before their habit (their turn). habit: their usual move (SAN). line: the engine's line after it
+ * {pv: [uci], cp, mate} (White's view); pv[0] is your best reply. steps[0] is their habit, captioned by `reason`
+ * (what it gives you); then your reply and the engine's follow-up, cut where it goes quiet.
+ */
+export function refutation({ before, habit, line }) {
+  const H = new Chess(before), them = H.turn(), me = them === "w" ? "b" : "w";
+  const hm = new Chess(before).move(habit), afterH = hm.after, A = new Chess(afterH);
+  const plies = play(afterH, line?.pv || []);
+  const r = plies[0]?.move;
+  const guards = (sq) => A.attackers(sq, them).length;
+  const sign = me === "w" ? 1 : -1;
+  const myMate = line?.mate != null && sign * line.mate > 0 ? sign * line.mate : null;
+
+  let reason;
+  if (!r) reason = "Stockfish doesn't like it.";
+  else if (r.san.endsWith("#")) reason = `Allows ${b(r.san)}, mate.`;
+  else if (r.captured && r.to === hm.to)
+    reason = `Their ${NAME[hm.piece]} goes to ${hm.to}, where your ${NAME[r.piece]} takes it` +
+      (!guards(r.to) ? ", and nothing defends it." : VALUE[r.piece] < VALUE[r.captured] ? ": taking back still leaves them down." : ".");
+  else if (r.captured && H.attackers(r.to, them).includes(hm.from) && !A.attackers(r.to, them).includes(hm.to))
+    reason = `Their ${NAME[hm.piece]} on ${hm.from} was guarding the ${NAME[r.captured]} on ${r.to}; after ${b(hm.san)} ` +
+      (guards(r.to) ? "it isn't guarded enough." : "nothing does.");
+  else if (between(r.from, r.to).includes(hm.from))
+    reason = `Their ${NAME[hm.piece]} on ${hm.from} was blocking your ${NAME[r.piece]}; ${b(hm.san)} opens the line to ${r.to}.`;
+  else if (r.captured && !guards(r.to)) reason = `Leaves their ${NAME[r.captured]} on ${r.to} undefended, and you take it.`;
+  else if (r.captured && VALUE[r.piece] < VALUE[r.captured])
+    reason = `Lets your ${NAME[r.piece]} take their ${NAME[r.captured]}: even if they take back, they're down.`;
+  else if (r.captured) reason = `Lets you take their ${NAME[r.captured]} on ${r.to}.`;
+  else {
+    const hits = targets(plies[0].after, r.to).filter((x) => x.type !== "k").map((x) => NAME[x.type]);
+    if (myMate) reason = `Allows ${b(r.san)}, and mate follows.`;
+    else if (r.san.includes("+") && hits.length) reason = `Allows ${b(r.san)}: check, and it also hits their ${hits[0]}.`;
+    else if (hits.length > 1) reason = `Allows ${b(r.san)}, forking their ${hits[0]} and ${hits[1]}.`;
+    else if (hits.length) reason = `Allows ${b(r.san)}, attacking their ${hits[0]}.`;
+    else if (r.san.includes("+")) reason = `Allows ${b(r.san)}, with check.`;
+    else reason = `Allows ${b(r.san)}.`;
+  }
+
+  const shown = r ? quietCut(plies, 3) : [];
+  const steps = [{ ply: { move: hm, before, after: afterH }, text: reason },
+    ...shown.map((p, i) => ({ ply: p, text: caption(p, i ? shown[i - 1] : null, me) }))];
+  const end = shown.at(-1)?.after ?? afterH;
+  const d = sign * (material(end) - material(before));
+  const edge = line?.cp != null ? `${sign * line.cp > 0 ? "+" : ""}${(sign * line.cp / 100).toFixed(1)}` : null;
+  const summary = myMate ? `Mate in ${myMate}.`
+    : d > 0 ? `You come out ${amount(d)} up.`
+    : `Material ${d < 0 ? `costs you ${amount(-d)}` : "stays level"} for now, but you're clearly better${edge ? ` (${edge})` : ""}.`;
+  return { reason, idea: shown.length > 0, steps, summary };
+}

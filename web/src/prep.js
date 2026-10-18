@@ -162,3 +162,26 @@ export function bookExit(tree) {
   return b.length ? Math.round(b.reduce((s, x) => s + x, 0) / b.length / 2 + 0.5) : null;
 }
 
+
+/**
+ * The road to a node: each move from the start, whose it was, and for their moves the share of their games at that
+ * point that went this way. odds: the product of those shares, the chance they follow the road when you play your
+ * moves on it (from their games, so a guide, not a promise).
+ */
+export function road(nd, theirColor) {
+  const steps = [];
+  let odds = 1;
+  for (let x = nd; x?.parent; x = x.parent) {
+    const theirs = x.parent.fen.split(" ")[1] === theirColor, share = x.n / x.parent.n;
+    if (theirs) odds *= share;
+    steps.unshift({ node: x, theirs, share });
+  }
+  return { steps, odds };
+}
+
+/** Game plans, best first: their costly habits ranked by the chance they walk into one times what it costs (capped). */
+export function rankPlans(slips, theirColor, { lossCap = 500 } = {}) {
+  return slips.map((s) => ({ ...s, ...road(s.move, theirColor) }))
+    .map((p) => ({ ...p, value: p.odds * Math.min(p.loss, lossCap) }))
+    .sort((a, b) => b.value - a.value);
+}
