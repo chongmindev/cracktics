@@ -177,3 +177,54 @@ export function walkthrough({ before, played, reply, better, line = null }) {
     : "Material stays level, and the threat is gone.";
   return { reason, idea, steps: idea ? steps : steps.slice(0, 1), summary };
 }
+
+/**
+ * Why their punishment works, in the same shape as walkthrough(): {reason, idea, steps, summary}.
+ * after: FEN after my move (their turn). reply: their move (SAN). before, played: FEN before my move and my move
+ * (SAN), when known, so the reason can say what my move changed. line: engine line after the reply {pv, cp, mate}.
+ * mate: moves to mate for them from `after`, if any.
+ */
+export function punishment({ after, reply, before = null, played = null, line = null, mate = null }) {
+  const A = new Chess(after), opp = A.turn(), me = opp === "w" ? "b" : "w", Opp = side(opp);
+  const rm = new Chess(after).move(reply), afterReply = rm.after;
+  let B = null, pm = null;
+  if (before && played) try { B = new Chess(before); pm = new Chess(before).move(played); } catch { B = pm = null; }
+  const defenders = (sq) => A.attackers(sq, me).length;
+
+  let reason;
+  if (rm.san.endsWith("#")) reason = "Checkmate.";
+  else if (pm && B.get(pm.from)?.color === me && between(rm.from, rm.to).includes(pm.from))
+    reason = `Your ${NAME[pm.piece]} on ${pm.from} was in the ${NAME[rm.piece]}'s way; ${b(pm.san)} opened the line to ${rm.to}.`;
+  else if (rm.captured) {
+    const victim = NAME[rm.captured], check = rm.san.includes("+") ? " And it's check." : "";
+    if (pm && rm.to === pm.to && pm.captured && defenders(rm.to) && VALUE[rm.piece] >= VALUE[pm.piece])
+      reason = `${Opp} takes back on ${rm.to}; the trouble comes next.${check}`;
+    else if (pm && rm.to === pm.to)
+      reason = `Your ${NAME[pm.piece]} went to ${rm.to}, where the ${NAME[rm.piece]} takes it` +
+        (!defenders(rm.to) ? ", and nothing defends it." : VALUE[rm.piece] < VALUE[rm.captured] ? ": taking back still leaves you down." : ".") + check;
+    else if (pm && B.attackers(rm.to, me).includes(pm.from) && !A.attackers(rm.to, me).includes(pm.to))
+      reason = `Your ${NAME[pm.piece]} on ${pm.from} was guarding the ${victim}; after ${b(pm.san)} ` +
+        (defenders(rm.to) ? "it isn't guarded enough." : "nothing does.") + check;
+    else if (!defenders(rm.to)) reason = `Takes your ${victim}, which nothing defends.${check}`;
+    else if (VALUE[rm.piece] < VALUE[rm.captured]) reason = `Takes your ${victim} with a ${NAME[rm.piece]}: even if you take back, you're down.${check}`;
+    else reason = `Takes your ${victim}.${check}`;
+  } else {
+    const hits = targets(afterReply, rm.to).filter((x) => x.type !== "k").map((x) => NAME[x.type]);
+    if (rm.promotion) reason = `Makes a ${NAME[rm.promotion]}.`;
+    else if (rm.san.includes("+")) reason = hits.length ? `Check, and the ${NAME[rm.piece]} also hits your ${hits[0]}.` : "Check.";
+    else if (hits.length) reason = `Attacks your ${hits[0]}${hits[1] ? ` and ${hits[1]}` : ""}.`;
+    else reason = `${Opp}'s strongest move here.`;
+  }
+
+  const plies = [{ move: rm, before: after, after: afterReply }, ...play(afterReply, line?.pv || [])];
+  const shown = quietCut(plies, 3);
+  const steps = shown.map((p, i) => ({ ply: p, text: i === 0 ? reason : caption(p, shown[i - 1], me) }));
+  const sign = me === "w" ? 1 : -1;
+  const d = sign * (material(shown.at(-1).after) - material(B ? before : after));
+  const idea = mate != null || (shown.length >= 3 && (d !== 0 || shown.slice(1).some((p) => p.move.captured || p.move.san.includes("+"))));
+  const summary = mate != null ? `${Opp} mates in ${mate}.`
+    : d < 0 ? `${Opp} comes out ${amount(-d)} up.`
+    : d > 0 ? `You keep ${amount(d)} more, but ${Opp} is much better.`
+    : `Material stays level, but ${Opp} is much better.`;
+  return { reason, idea, steps: idea ? steps : steps.slice(0, 1), summary };
+}

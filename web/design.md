@@ -126,6 +126,7 @@ interface washes, `--sq-light` / `--sq-dark` for the board, `--board-mark` for m
 | Component | Class | Notes |
 |---|---|---|
 | Bar | `.bar` | 56px, wordmark left (the favicon's knight in page ink + name, a link home; hover tips the hat), links, sound and theme right (no status chip: the scan's progress shows in the panel), 4px rule below |
+| Why it works | `.walk.why` | after their punishment is found or revealed: what my move gave up (a guard, a blocked line, a loose piece), then the engine's follow-up, stepped like the idea; dims and stops stepping once the fix starts |
 | The idea | `.walk` | after the fix: every caption shows at once; the engine's move plays, then you step with Next move or by clicking a row (no autoplay) |
 | Footer | `.foot` | full width under both columns, lined up with them, words from the left |
 | Step previews | `.how .peek` | hover or focus on Fetch / Scan / Drill shows a small looping picture of that step |

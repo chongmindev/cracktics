@@ -11,7 +11,7 @@
 // the engine's line is walked through on the board with a caption per move.
 
 import { Chess } from "chess.js";
-import { material, numbered, walkthrough } from "./explain.js";
+import { material, numbered, punishment, walkthrough } from "./explain.js";
 
 export { material };
 
@@ -327,8 +327,9 @@ export class Trainer {
     this.setArrows([], null);
     this.step = "found";
     this.liveIdx = null;
+    let replyIdx = this.replyIdx = null;
     if (rm) {
-      const i = this.addFrame(this.after(cur.fen, rm), rm, this.findIdx, "them", theirs);
+      const i = replyIdx = this.replyIdx = this.addFrame(this.after(cur.fen, rm), rm, this.findIdx, "them", theirs);
       this.badge = !revealed && cur.kind === "threat" ? { sq: rm.to, ok: true, frame: i } : null;
       this.goto(i);
     }
@@ -344,9 +345,11 @@ export class Trainer {
         this.els.fixGo.focus({ preventScroll: true });
         this.showInDrill(this.els.fixGo);
         this.paintStep();
+        this.whyItWorks(cur, replyIdx);
         return;
       }
       this.finish();
+      this.whyItWorks(cur, replyIdx);
     } else {
       this.feedback(this.firstTry === true, revealed ? "It was safe" : this.firstTry ? "Safe. Well judged" : "Safe after all",
         this.card(`${opp}'s best try`, theirs, "", this.what(rm)), this.evalBar(cur.evb, cur.eva));
@@ -387,7 +390,10 @@ export class Trainer {
     this.paintStep();
     // Play their reply and my move backwards, marked as a rewind, then hand the board over.
     this.busy = true;
-    await this.rewind([this.findIdx, this.beforeIdx]);
+    this.walkToken = null;
+    this.els.feedback.querySelector(".why")?.classList.add("done");
+    // From further down their line, jump back to their reply first; then rewind their reply and my move.
+    await this.rewind([this.replyIdx, this.findIdx, this.beforeIdx]);
     if (this.cur !== cur || this.step !== "fix") return;
     this.busy = false;
     this.render();
@@ -471,6 +477,52 @@ export class Trainer {
     this.walk(cur);
   }
 
+  /**
+   * Fill a walkthrough box: every caption at once, the board following the row you're on. You step through by
+   * clicking a row or the button; nothing plays by itself. Returns show(k), which moves the board to step k.
+   */
+  stepper(box, head, w, idx, token) {
+    const rows = w.steps.map((st, k) =>
+      `<li><button type="button" data-k="${k}"><b>${esc(numbered(st.ply.before, st.ply.move))}</b><span>${st.text}</span></button></li>`).join("");
+    box.innerHTML = head + `<ol class="walk-steps">${rows}</ol>` + (w.idea ? `<p class="walk-sum">${esc(w.summary)}</p>` : "") +
+      (idx.length > 1 ? `<button class="btn ghost walk-step" type="button"></button>` : "");
+    const step = box.querySelector(".walk-step");
+    let at = 0;
+    const show = (k) => {
+      if (this.walkToken !== token) return;
+      at = k;
+      this.goto(idx[k]);
+      box.querySelectorAll(".walk-steps li").forEach((li, j) => li.classList.toggle("on", j === k));
+      if (step) step.innerHTML = k < idx.length - 1 ? `Next move <svg class="icon"><use href="#i-next"/></svg>`
+        : `<svg class="icon"><use href="#i-replay"/></svg>From the start`;
+    };
+    box.querySelector(".walk-steps").addEventListener("click", (e) => { const b = e.target.closest("[data-k]"); if (b) show(+b.dataset.k); });
+    step?.addEventListener("click", () => show(at < idx.length - 1 ? at + 1 : 0));
+    return show;
+  }
+
+  /** Why their punishment works: one line on what my move allowed, then the engine's follow-up, stepped like the idea. */
+  async whyItWorks(cur, replyIdx) {
+    const fb = this.els.feedback.querySelector(".fb");
+    if (!fb || replyIdx == null) return;
+    const token = this.walkToken = {};
+    const head = `<p class="label">Why it works · ${esc(this.frames[replyIdx].san)}</p>`;
+    const box = document.createElement("div");
+    box.className = "walk why";
+    box.innerHTML = head + `<p class="walk-wait">Working it out…</p>`;
+    fb.appendChild(box);
+    let line = null;
+    try { if (this.analyse) [line] = await this.analyse(this.frames[replyIdx].fen); } catch {}
+    if (this.walkToken !== token) return;
+    let w;
+    try { w = punishment({ after: cur.fen, reply: cur.reply, before: cur.before_fen, played: cur.san, line, mate: cur.mate > 0 ? cur.mate : null }); }
+    catch { box.remove(); return; }
+    let at = replyIdx;
+    const idx = w.steps.map(({ ply }, k) => (k === 0 ? replyIdx : (at = this.addFrame(ply.after, ply.move, at, "pv", numbered(ply.before, ply.move)))));
+    this.stepper(box, head, w, idx, token)(0);
+    this.showInDrill(this.els.fixGo.hidden ? this.els.next : this.els.fixGo);
+  }
+
   /** The idea behind the engine's move: its line played on the board, a caption per move (or one line if quiet). */
   async walk(cur) {
     const fb = this.els.feedback.querySelector(".fb");
@@ -496,23 +548,7 @@ export class Trainer {
       if (k === 0) return at >= 0 ? at : (at = this.addFrame(ply.after, ply.move, this.beforeIdx, "fix", numbered(ply.before, ply.move)));
       return (at = this.addFrame(ply.after, ply.move, at, "pv", numbered(ply.before, ply.move)));
     });
-    // Every caption shows at once; the board follows the row you're on. You step through (click a row or the button);
-    // nothing plays by itself after the engine's move.
-    const rows = w.steps.map((st, k) =>
-      `<li><button type="button" data-k="${k}"><b>${esc(numbered(st.ply.before, st.ply.move))}</b><span>${st.text}</span></button></li>`).join("");
-    box.innerHTML = head + `<ol class="walk-steps">${rows}</ol>` + (w.idea ? `<p class="walk-sum">${esc(w.summary)}</p>` : "") +
-      (idx.length > 1 ? `<button class="btn ghost walk-step" type="button"></button>` : "");
-    const step = box.querySelector(".walk-step");
-    const show = (k) => {
-      if (this.walkToken !== token) return;
-      this.walkAt = k;
-      this.goto(idx[k]);
-      box.querySelectorAll(".walk-steps li").forEach((li, j) => li.classList.toggle("on", j === k));
-      if (step) step.innerHTML = k < idx.length - 1 ? `Next move <svg class="icon"><use href="#i-next"/></svg>`
-        : `<svg class="icon"><use href="#i-replay"/></svg>From the start`;
-    };
-    box.querySelector(".walk-steps").addEventListener("click", (e) => { const b = e.target.closest("[data-k]"); if (b) show(+b.dataset.k); });
-    step?.addEventListener("click", () => show(this.walkAt < idx.length - 1 ? this.walkAt + 1 : 0));
+    const show = this.stepper(box, head, w, idx, token);
     // Start from "before" so the engine's move itself is seen.
     if (this.view !== idx[0]) {
       this.goto(this.beforeIdx);
