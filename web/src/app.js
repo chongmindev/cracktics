@@ -92,7 +92,7 @@ async function start(store, trainer, site, username, rangeValue, timeClasses) {
   }
   // The Lichess cloud is off: measured slower than local engines (docs/decisions.md). Pass a LichessCloud to enable.
   const evaluator = new Evaluator({ store, pool, cloud: null });
-  // The fix step asks the same engines (and cache) whether a move holds.
+  // A move outside the accepted list is judged by the same engines (and cache).
   trainer.evaluate = async (fen) => (await evaluator.forGame()(fen, cfg.drills.depth, 1))[0];
   // Explanations want the engine's whole line, which the cache doesn't keep: a fresh search, one position.
   trainer.analyse = (fen) => pool.analyse(fen, cfg.drills.depth, 1, true);
@@ -104,7 +104,6 @@ async function start(store, trainer, site, username, rangeValue, timeClasses) {
 
   const t0 = Date.now();
   scan = new Scan({ username: playerKey(site, username), games, evaluator, store, cfg, concurrency: pool.size, onUpdate: (u) => {
-    const threats = u.deck.filter((i) => i.kind === "threat").length;
     setState(u.running ? "scanning" : "ready");
     // Quick pass fills the first 60% of the meter, the deep pass the rest.
     const frac = u.total ? u.done / u.total : 1;
@@ -113,7 +112,7 @@ async function start(store, trainer, site, username, rangeValue, timeClasses) {
     const pass = u.phase === 1 ? "Quick pass" : "Deep pass";
     $("status-text").textContent = u.running
       ? `${pass} · ${u.done}/${u.total} games · ${u.deck.length} positions · ${secs}s`
-      : `${u.total} games · ${u.deck.length} positions · ${threats} threats`;
+      : `${u.total} games · ${u.deck.length} mistakes to replay`;
     document.body.dataset.view = u.deck.length ? "drill" : "waiting";
     trainer.setItems(u.deck);
   } });
@@ -129,13 +128,14 @@ async function main() {
   new ResizeObserver(fitHero).observe(document.querySelector(".stage"));
   const store = await openStore();
   const trainer = new Trainer({
-    board: $("board"), arrows: $("arrows"), pop: $("pop"), meta: $("meta"), step: $("step"), playedLabel: $("played-label"), played: $("played"), question: $("question"),
-    scan: $("scan"), feedback: $("feedback"), drill: document.querySelector(".drill"), note: $("note"), reveal: $("btn-reveal"), fixRow: $("fix-row"), showMe: $("btn-show"),
-    actions: $("actions"), next: $("btn-next"), fixGo: $("btn-fix"), safe: $("btn-safe"),
+    board: $("board"), arrows: $("arrows"), pop: $("pop"), meta: $("meta"), step: $("step"), question: $("question"), context: $("context"),
+    feedback: $("feedback"), drill: document.querySelector(".drill"), note: $("note"), hint: $("btn-hint"), showMe: $("btn-show"),
+    actions: $("actions"), next: $("btn-next"),
     material: $("material"),
     side: $("device-side"), boxes: $("boxes"),
     done: $("st-done"), acc: $("st-acc"), streak: $("st-streak"),
-  }, { load: async () => null, save: async () => {}, tolerance: cfg.trainer.fix_tolerance, cue: (kind) => sound.play(kind) });
+  }, { load: async () => null, save: async () => {}, within: cfg.drills.accept_within, gain: cfg.drills.accept_min_gain,
+    cue: (kind) => sound.play(kind) });
 
   // Site switch: the username label follows it; the button says Continue when this player has progress here.
   const paintCta = async () => {

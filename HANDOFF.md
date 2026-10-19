@@ -12,8 +12,9 @@ reason I lose.
 The project has two parts:
 1. **Backend (MCP server + engine pipeline):** pulls my finished Chess.com games, runs Stockfish,
    and extracts drill positions.
-2. **Front end (trainer):** shows each position right after my move and asks me to find White's
-   punishing reply, or confirm the move was safe. Uses spaced repetition.
+2. **Front end (trainer):** shows the position just before one of my mistakes and asks me to find the
+   move I missed. Uses spaced repetition. (Until 2026-10-19 it asked for the opponent's punishing reply
+   after my move, or "nothing works"; see docs/decisions.md.)
 
 ## What exists
 
@@ -40,18 +41,19 @@ Engine evals are cached by (FEN, depth, MultiPV) in `data/engine_cache.sqlite`, 
 Item ids are a hash of FEN + move, so trainer progress survives rebuilds.
 
 ### How positions are chosen
-- **Threat item:** my move lost >= 2.5 pawns at depth 13, the position wasn't already lost
-  (eval before > -3), and the opponent's best reply is a check or capture. Accepted answers = opponent moves
-  from MultiPV 5 within 0.8 pawns of the best and still winning >= 2 pawns vs. before.
-- **Safe item:** move 8+, my move lost <= 0.25 pawns, eval after between -1.5 and +4 for me, and
-  the opponent's eval after their best reply stays < 1.5. Sampled to about 60% of the threat count.
-- Item fields: `id`, `color` (my side), `fen` (opponent to move), `from`/`to` (my move), `san`, `move`, `opp`, `date`,
-  `result` (win/loss/draw for me), `kind`, plus `accept`, `accept_san`, `reply`, `mate`, `better`, `swing`, `evb`, `eva`.
+- **Mistake item:** move 3+, my move lost >= 1 pawn at depth 13, I wasn't already lost (eval before > -3)
+  and wasn't still winning easily after it (eval after < +5). Accepted answers = my moves from MultiPV 5
+  (before my move) within 0.5 pawns of the best that also beat my move by 0.75; any other move is judged by
+  the engine with the same two tests.
+- Item fields: `id`, `color` (my side), `before_fen` (the puzzle, me to move), `fen` (after my move), `from`/`to`
+  (my move), `san`, `move`, `opp`, `date`, `result` (win/loss/draw for me), `kind` ("mistake"), plus `accept`,
+  `accept_san`, `better`, `reply` (their best answer to my move), `mate` (mine, if the best line mates), `swing`,
+  `evb`, `eva`.
 
 ### Trainer behavior
 - Board oriented with my side at the bottom, Unicode pieces via Noto Sans Symbols 2, chess.js 0.10.3 for
   legal moves.
-- "Show checks & captures" highlights every opponent check/capture.
+- "Hint" marks the piece the best move moves (and counts as a miss).
 - Leitner boxes 1–5, stored in localStorage (per browser only).
 
 ## What I learned from the 50 games (context for priorities)

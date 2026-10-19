@@ -6,7 +6,7 @@ import chess
 import pytest
 
 from cracktics import config
-from cracktics.drills import Ply, build_items, item_id, safe_item, threat_item, walk
+from cracktics.drills import Ply, build_items, is_mistake_candidate, item_id, mistake_item, walk
 from cracktics.engine import Engine, Line
 from cracktics.games import Game, read_games
 
@@ -28,56 +28,49 @@ def ply_after(sans: str, color=chess.BLACK, before=0, after=-500, best="Nf6") ->
     board = chess.Board()
     for mv in g.moves[:-1]:
         board.push(mv)
-    san = board.san(g.moves[-1])
+    san, fen_before = board.san(g.moves[-1]), board.fen()
     board.push(g.moves[-1])
-    return Ply(g, (len(g.moves) + 1) // 2, board, g.moves[-1], san, best, before, after)
+    return Ply(g, (len(g.moves) + 1) // 2, board, g.moves[-1], san, best, before, after, fen_before)
 
 
 # --- pure selection rules, fake engine lines -----------------------------------------
 
-def test_threat_item_accepts_forcing_reply_and_close_alternatives():
-    # 1.e4 e5 2.Qh5 Nc6 3.Bc4 Nf6?? 4.Qxf7#
+def test_mistake_item_is_the_position_before_my_move_with_close_alternatives():
+    # 1.e4 e5 2.Qh5 Nc6 3.Bc4 Nf6?? (4.Qxf7#): before Nf6, g6 and Qe7 hold; Nf6 is the move I played
     p = ply_after("e4 e5 Qh5 Nc6 Bc4 Nf6", before=-20, after=-2000, best="g6")
-    lines = [Line("h5f7", 10000, 1), Line("c4f7", 400, None), Line("h5e5", 150, None)]
-    item = threat_item(D, p, lines, CAP)
-    assert item["kind"] == "threat" and item["color"] == "b"
-    assert item["reply"] == "Qxf7#" and item["mate"] == 1
-    assert item["accept"] == ["h5f7"]          # Bxf7+ is far worse than mate
-    assert item["better"] == "g6" and item["swing"] == 19.8
+    lines = [Line("g7g6", -20, None), Line("d8e7", 10, None), Line("d7d5", 300, None)]   # White's view
+    item = mistake_item(D, p, lines, Line("h5f7", 10000, 1), CAP)
+    assert item["kind"] == "mistake" and item["color"] == "b"
+    assert item["better"] == "g6" and item["accept"] == ["g7g6", "d8e7"] and item["accept_san"] == ["g6", "Qe7"]
+    assert item["reply"] == "Qxf7#" and item["san"] == "Nf6" and item["swing"] == 19.8
+    assert item["before_fen"] == p.fen_before and item["mate"] is None
 
 
-def test_threat_item_rejects_quiet_best_reply():
-    p = ply_after("e4 e5 Qh5 Nc6 Bc4 Nf6", before=-20, after=-500)
-    assert threat_item(D, p, [Line("g1f3", 500, None)], CAP) is None
+def test_mistake_item_never_accepts_the_move_I_played_and_needs_the_best_move_first():
+    p = ply_after("e4 e5 Qh5 Nc6 Bc4 Nf6", before=-20, after=-2000)
+    assert mistake_item(D, p, [Line("g8f6", 20, None), Line("g7g6", 10, None)], None, CAP) is None
+    assert mistake_item(D, p, [Line(None, 0, None)], None, CAP) is None
 
 
-def test_threat_item_needs_a_better_move_and_a_pv():
-    p = ply_after("e4 e5 Qh5 Nc6 Bc4 Nf6", before=-20, after=-2000, best=None)
-    assert threat_item(D, p, [Line("h5f7", 10000, 1)], CAP) is None
-    p.best_san = "g6"
-    assert threat_item(D, p, [Line(None, 10000, 0)], CAP) is None
+def test_mistake_item_answers_must_beat_my_move():
+    p = ply_after("e4 e5 Nf3 Nc6 Bc4 Nf6", before=0, after=-120)
+    lines = [Line("f8c5", 0, None), Line("f8e7", 60, None)]   # Be7 is close to the best but barely beats my move
+    item = mistake_item(D, p, lines, None, CAP)
+    assert item["accept"] == ["f8c5"]
 
 
-def test_threat_item_for_white_player_uses_opponent_point_of_view():
-    # 1.e4 e5 2.Qh5 Nc6 3.Qxe5+?? Nxe5
-    p = ply_after("e4 e5 Qh5 Nc6 Qxe5+", color=chess.WHITE, before=-30, after=-900, best="Bc4")
-    item = threat_item(D, p, [Line("c6e5", -900, None), Line("f8e7", -150, None)], CAP)
-    assert item["color"] == "w" and item["reply"] == "Nxe5" and item["accept"] == ["c6e5"]
-    assert item["mate"] is None
+def test_mistake_mate_is_mine_when_I_am_white():
+    p = ply_after("e4 e5 Qh5 Nc6 Qxe5+", color=chess.WHITE, before=300, after=-900, best="Bc4")
+    item = mistake_item(D, p, [Line("f1c4", 10000, 3)], Line("c6e5", -900, None), CAP)
+    assert item["mate"] == 3 and item["color"] == "w" and item["reply"] == "Nxe5"
 
 
-def test_mate_is_reported_from_opponent_side_when_opponent_is_black():
-    p = ply_after("e4 e5 Qh5 Nc6 Qxe5+", color=chess.WHITE, before=-30, after=-2000, best="Bc4")
-    item = threat_item(D, p, [Line("c6e5", -10000, -3)], CAP)
-    assert item["mate"] == 3
-
-
-def test_safe_item_bounds():
-    p = ply_after("e4 e5 Nf3 Nc6", before=-30, after=-40)
-    assert safe_item(D, p, [Line("f1b5", 40, None)], CAP)["reply"] == "Bb5"
-    assert safe_item(D, p, [Line("f1b5", D.safe_max_opp_eval, None)], CAP) is None
-    p.after = D.safe_after_min - 1
-    assert safe_item(D, p, [Line("f1b5", 40, None)], CAP) is None
+def test_mistake_candidates():
+    p = ply_after("e4 e5 Qh5 Nc6 Bc4 Nf6", before=-20, after=-2000)
+    assert is_mistake_candidate(D, p)
+    assert not is_mistake_candidate(D, replace(p, before=-900))          # already lost
+    assert not is_mistake_candidate(D, replace(p, before=900, after=700))  # still winning easily
+    assert not is_mistake_candidate(D, replace(p, before=0, after=-50))    # too small
 
 
 def test_item_id_is_stable_and_position_specific():
@@ -108,13 +101,15 @@ def test_walk_stops_when_my_move_ends_the_game():
 
 def test_build_items_only_runs_multipv_on_candidates():
     g = game_from("e4 e5 Qh5 Nc6 Bc4 Nf6 Qxf7#", result="1-0")
-    after_nf6 = chess.Board()
-    for san in "e4 e5 Qh5 Nc6 Bc4 Nf6".split():
-        after_nf6.push_san(san)
-    eng = FakeEngine(evals={after_nf6.fen(): [Line("h5f7", 10000, 1)]})
+    before_nf6, after_nf6 = chess.Board(), chess.Board()
+    for san in "e4 e5 Qh5 Nc6 Bc4".split():
+        before_nf6.push_san(san)
+    after_nf6 = before_nf6.copy()
+    after_nf6.push_san("Nf6")
+    eng = FakeEngine(evals={before_nf6.fen(): [Line("g7g6", 0, None)], after_nf6.fen(): [Line("h5f7", 10000, 1)]})
     items = build_items([g], eng, CFG)
-    assert [i["san"] for i in items] == ["Nf6"] and items[0]["result"] == "loss"
-    assert [fen for fen, mpv in eng.calls if mpv > 1] == [after_nf6.fen()]
+    assert [(i["san"], i["better"], i["reply"]) for i in items] == [("Nf6", "g6", "Qxf7#")] and items[0]["result"] == "loss"
+    assert [fen for fen, mpv in eng.calls if mpv > 1] == [before_nf6.fen()]
 
 
 def test_read_games_detects_color_case_insensitively_and_skips_variants():
@@ -138,12 +133,11 @@ def engine(tmp_path):
 
 
 @needs_engine
-def test_engine_finds_scholars_mate_threat(engine):
+def test_engine_finds_scholars_mate_mistake(engine):
     g = game_from("e4 e5 Qh5 Nc6 Bc4 Nf6 Qxf7#", result="1-0")
     items = build_items([g], engine, CFG)
-    threat = [i for i in items if i["kind"] == "threat"]
-    assert len(threat) == 1 and threat[0]["san"] == "Nf6"
-    assert threat[0]["reply"] == "Qxf7#" and threat[0]["mate"] == 1
+    assert [(i["san"], i["reply"]) for i in items] == [("Nf6", "Qxf7#")]
+    assert "Nf6" not in items[0]["accept_san"] and items[0]["better"] in items[0]["accept_san"]
 
 
 @needs_engine
@@ -151,6 +145,7 @@ def test_engine_finds_hung_queen_as_white(engine):
     g = game_from("e4 e5 Qh5 Nc6 Qxe5+ Nxe5", color=chess.WHITE, result="0-1")
     items = build_items([g], engine, CFG)
     assert [(i["san"], i["reply"], i["color"]) for i in items] == [("Qxe5+", "Nxe5", "w")]
+    assert items[0]["before_fen"].split()[1] == "w"
 
 
 @needs_engine
@@ -168,23 +163,6 @@ def test_engine_handles_game_over(engine):
         board.push_san(san)
     [line] = engine.analyse(board, 8)
     assert line.move is None and line.pov(chess.BLACK) == CFG.engine.mate_score
-
-
-def test_safe_sampling_does_not_depend_on_game_order():
-    c = replace(CFG, drills=replace(D, safe_sample_rate=0.5, safe_ratio=100))
-    a = game_from("e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d3 d6 O-O O-O Re1 a6 Bb3 Ba7 h3 h6 Nbd2 Re8 Nf1 Be6")
-    b = game_from("d4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O Nf3 h6 Bh4 b6 cxd5 exd5 Bd3 Bb7 O-O c5 Rc1 Nbd7")
-    threat = game_from("e4 e5 Qh5 Nc6 Bc4 Nf6 Qxf7#", result="1-0")    # the cap needs a threat item
-    after_nf6 = chess.Board()
-    for san in "e4 e5 Qh5 Nc6 Bc4 Nf6".split():
-        after_nf6.push_san(san)
-    eng = lambda: FakeEngine(evals={after_nf6.fen(): [Line("h5f7", 10000, 1)]})
-    one = build_items([threat, a, b], eng(), c)
-    two = build_items([b, threat, a], eng(), c)
-    assert sorted(i["id"] for i in one) == sorted(i["id"] for i in two)
-    assert any(i["kind"] == "safe" for i in one)
-    # adding a game never removes a safe item that was already chosen (cap not binding here)
-    assert {i["id"] for i in build_items([threat, a], eng(), c)} <= {i["id"] for i in one}
 
 
 def test_pawns_rounds_halves_away_from_zero():

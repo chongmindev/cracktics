@@ -103,13 +103,12 @@ button.b.primary{background:var(--accent);border-color:var(--accent);color:#fff}
       <div class="meta" id="meta"></div>
       <p class="prompt" id="prompt"></p>
       <ol class="steps" id="steps">
-        <li>List every check your opponent has.</li>
-        <li>List every capture your opponent has.</li>
-        <li>Ask what's newly loose after your move.</li>
+        <li>List every check and capture you have.</li>
+        <li>List what your opponent threatens.</li>
+        <li>Then pick the move that does the most.</li>
       </ol>
       <div class="btns" id="actions">
-        <button class="b" id="btn-hint" type="button">Show checks &amp; captures</button>
-        <button class="b" id="btn-safe" type="button">Nothing works for them</button>
+        <button class="b" id="btn-hint" type="button">Hint: the piece to move</button>
       </div>
       <div id="feedback"></div>
       <div class="btns"><button class="b primary" id="btn-next" type="button" hidden>Next position</button></div>
@@ -127,10 +126,11 @@ const ITEMS = __ITEMS__;
 const PIECE = {k:"♚︎",q:"♛︎",r:"♜︎",b:"♝︎",n:"♞︎",p:"♟︎"};
 const FILES="abcdefgh";
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-let boxes=store.get("tsd-boxes",{});      // id -> 1..5
-let stats=store.get("tsd-stats",{done:0,ok:0,streak:0});
-let seen=store.get("tsd-seen",{});        // id -> turn last shown
-let turn=store.get("tsd-turn",0);
+// "ctm-": mistake puzzles (the older "tsd-" keys held the threat drill's progress)
+let boxes=store.get("ctm-boxes",{});      // id -> 1..5
+let stats=store.get("ctm-stats",{done:0,ok:0,streak:0});
+let seen=store.get("ctm-seen",{});        // id -> turn last shown
+let turn=store.get("ctm-turn",0);
 let cur=null, game=null, sel=null, answered=false, hintOn=false;
 
 function pick(){
@@ -143,7 +143,7 @@ function pick(){
 }
 
 const meW=()=>(cur.color||"b")==="w";     // my side; items without a color are from the Black-only prototype
-const OPP=()=>meW()?"Black":"White";
+const ME=()=>meW()?"White":"Black";
 function lbl(n,white,san){return `<span class="mv">${n}${white?".":"…"}${san}</span>`}
 function sqName(r,c){ // row 0 is the top row; my side is at the bottom
   return meW()? FILES[c]+(8-r) : FILES[7-c]+(r+1);
@@ -155,13 +155,12 @@ function render(){
   let moves=answered?[]:game.moves({verbose:true});
   const targets=sel?moves.filter(m=>m.from===sel):[];
   const hintSq=new Set();
-  if(hintOn&&!answered) moves.forEach(m=>{if(m.flags.includes("c")||m.flags.includes("e")||m.san.includes("+")||m.san.includes("#")){hintSq.add(m.from);hintSq.add(m.to)}});
+  if(hintOn&&!answered){try{hintSq.add(new Chess(cur.before_fen).move(cur.better).from)}catch(e){}}
   for(let r=0;r<8;r++)for(let c=0;c<8;c++){
     const s=sqName(r,c), p=game.get(s);
     const b=document.createElement("button"); b.type="button";
     b.className="sq"+(((FILES.indexOf(s[0])+(+s[1]))%2===1)?" d":"")+(sel===s?" sel":"");
     b.setAttribute("aria-label",s+(p?" "+(p.color==="w"?"white ":"black ")+({k:"king",q:"queen",r:"rook",b:"bishop",n:"knight",p:"pawn"})[p.type]:""));
-    if(s===cur.from||s===cur.to){const l=document.createElement("span");l.className="lm";b.appendChild(l)}
     if(hintSq.has(s)){const h=document.createElement("span");h.className="hintmark";b.appendChild(h)}
     if(c===0){const k=document.createElement("span");k.className="coord r";k.textContent=s[1];b.appendChild(k)}
     if(r===7){const k=document.createElement("span");k.className="coord f";k.textContent=s[0];b.appendChild(k)}
@@ -197,32 +196,25 @@ function tap(s){
 
 function uciOf(m){return m.from+m.to+(m.promotion||"")}
 
-function answer(m){ // m = verbose move or null for "nothing works"
+function answer(m){ // m = verbose move: one try, then the answer
   answered=true; sel=null;
-  const isThreat=cur.kind==="threat";
-  let ok, html;
-  const yourMove=lbl(cur.move,meW(),cur.san), better=lbl(cur.move,meW(),cur.better);
-  if(isThreat){
-    ok=!!m && cur.accept.some(u=>u.slice(0,4)===uciOf(m).slice(0,4));
-    const best=meW()? lbl(cur.move,false,cur.reply) : lbl(cur.move+1,true,cur.reply);
-    const what=cur.mate!=null&&cur.mate>0?`It's mate in ${cur.mate}.`:`That swings the position by about ${cur.swing} pawns (from ${fmt(cur.evb)} to ${fmt(cur.eva)} for you).`;
-    const extra=cur.accept_san.length>1?` Also strong: ${cur.accept_san.filter(x=>x!==cur.reply).map(x=>`<span class="mv">${x}</span>`).join(" ")}.`:"";
-    if(ok) html=`<h2>Found it.</h2><p>${m?`<span class="mv">${m.san}</span> punishes ${yourMove}.`:""} ${what}${extra}</p><p>In the game you should have played ${better} instead.</p>`;
-    else html=`<h2>${m?"Not the one.":"There was a threat."}</h2><p>${OPP()}'s best is ${best}. ${what}${extra}</p><p>Instead of ${yourMove}, the engine wanted ${better}.</p>`;
-    const g2=new Chess(cur.fen); const rm=g2.move(cur.reply,{sloppy:true});
-    if(rm) drawArrows([[rm.from,rm.to,ok?"--good":"--bad"]]);
-  } else {
-    ok=!m;
-    if(ok) html=`<h2>Correct, it's safe.</h2><p>${yourMove} doesn't hang anything. ${OPP()}'s best try is <span class="mv">${cur.reply}</span>, and the position stays about ${fmt(cur.eva)} for you.</p>`;
-    else html=`<h2>False alarm.</h2><p><span class="mv">${m.san}</span> doesn't win anything here. ${yourMove} was a safe move, and ${OPP()}'s best is only <span class="mv">${cur.reply}</span>. Over-worrying costs time on the clock, so it's worth getting these right too.</p>`;
-    if(m) drawArrows([[m.from,m.to,"--bad"]]);
-  }
+  const ok=cur.accept.some(u=>u.slice(0,4)===uciOf(m).slice(0,4)) && !hintOn;
+  const better=lbl(cur.move,meW(),cur.better), played=lbl(cur.move,meW(),cur.san);
+  const reply=cur.reply?(meW()?lbl(cur.move,false,cur.reply):lbl(cur.move+1,true,cur.reply)):"";
+  const cost=cur.mate?`The best move had mate in ${cur.mate}.`:`It cost about ${cur.swing} pawns (from ${fmt(cur.evb)} to ${fmt(cur.eva)} for you).`;
+  const also=cur.accept_san.length>1?` Also good: ${cur.accept_san.filter(x=>x!==cur.better).map(x=>`<span class="mv">${x}</span>`).join(" ")}.`:"";
+  const right=cur.accept.some(u=>u.slice(0,4)===uciOf(m).slice(0,4));
+  let html;
+  if(right) html=`<h2>${ok?"Found it.":"Right, with a hint."}</h2><p><span class="mv">${m.san}</span> is ${m.san===cur.better?"the engine's move":"as good as the engine's "+better}.${also}</p><p>In the game you played ${played}${reply?`, and ${ME()==="White"?"Black":"White"} answered ${reply}`:""}. ${cost}</p>`;
+  else html=`<h2>${m.from+m.to===cur.from+cur.to?"That's what you played.":"Not the one."}</h2><p>The engine's move is ${better}.${also}</p><p>In the game you played ${played}${reply?`, and the answer was ${reply}`:""}. ${cost}</p>`;
+  let bm=null; try{bm=new Chess(cur.before_fen).move(cur.better)}catch(e){}
+  drawArrows([...(bm?[[bm.from,bm.to,"--good"]]:[]),...(right?[]:[[m.from,m.to,"--bad"]])]);
   // Leitner update
   const b=boxes[cur.id]||0;
   boxes[cur.id]= ok? Math.min(5,Math.max(1,b)+1) : 1;
   seen[cur.id]=turn; turn++;
   stats.done++; if(ok){stats.ok++;stats.streak++}else stats.streak=0;
-  store.set("tsd-boxes",boxes);store.set("tsd-stats",stats);store.set("tsd-seen",seen);store.set("tsd-turn",turn);
+  store.set("ctm-boxes",boxes);store.set("ctm-stats",stats);store.set("ctm-seen",seen);store.set("ctm-turn",turn);
   document.getElementById("feedback").innerHTML=`<div class="fb ${ok?"ok":"no"}" role="status">${html}</div>`;
   document.getElementById("actions").hidden=true;
   const nx=document.getElementById("btn-next"); nx.hidden=false; nx.focus();
@@ -240,12 +232,11 @@ function paintStats(){
 }
 
 function next(){
-  cur=pick(); game=new Chess(cur.fen); sel=null; answered=false; hintOn=false;
+  cur=pick(); game=new Chess(cur.before_fen); sel=null; answered=false; hintOn=false;
   const [y,mo,d]=cur.date.split("-");
   const res={win:"you won",loss:"you lost",draw:"draw","0-1":"you won","1-0":"you lost","1/2-1/2":"draw"}[cur.result]||"";
   document.getElementById("meta").innerHTML=`<span>vs ${cur.opp}</span><span>${mo}/${d}</span><span>move ${cur.move}</span><span>${res}</span>`;
-  document.getElementById("prompt").innerHTML=`You just played ${lbl(cur.move,meW(),cur.san)}. ${OPP()} to move. Does ${OPP()} have a move that punishes it?`;
-  document.getElementById("btn-safe").textContent=`Nothing works for ${OPP()}`;
+  document.getElementById("prompt").innerHTML=`You went wrong here in this game. ${ME()} to move: find the best move.`;
   document.getElementById("board").setAttribute("aria-label",`Chess board, ${meW()?"White":"Black"} at the bottom`);
   document.getElementById("feedback").innerHTML="";
   document.getElementById("actions").hidden=false;
@@ -253,11 +244,9 @@ function next(){
   drawArrows([]); render(); paintStats();
 }
 
-document.getElementById("btn-safe").addEventListener("click",()=>{if(!answered)answer(null)});
-document.getElementById("btn-hint").addEventListener("click",()=>{hintOn=!hintOn;render()});
+document.getElementById("btn-hint").addEventListener("click",()=>{hintOn=true;render()});
 document.getElementById("btn-next").addEventListener("click",next);
-const nT=ITEMS.filter(i=>i.kind==="threat").length;
-document.getElementById("foot").textContent=`${ITEMS.length} positions from your games${span()}: ${nT} where your move lost 2.5+ pawns to a check or capture, and ${ITEMS.length-nT} where your move was safe. Tap one of your opponent's pieces, then its target square, to answer. Progress is saved in this browser only.`;
+document.getElementById("foot").textContent=`${ITEMS.length} positions from your games${span()}, each just before a move that cost you a pawn or more. Tap one of your pieces, then its target square, to answer. Progress is saved in this browser only.`;
 function span(){const d=ITEMS.map(i=>i.date).filter(Boolean).sort();if(!d.length)return"";const f=x=>{const[,m,dd]=x.split("-");return `${+m}/${+dd}`};return ` (${f(d[0])} – ${f(d[d.length-1])})`}
 next();
 </script>

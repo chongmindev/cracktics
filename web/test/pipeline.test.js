@@ -178,7 +178,7 @@ test("quick pass items are identical to the full pass's; the deep pass finds wha
   // A screen that is blind to it misses it; the two-phase Scan still ends with the exact full deck.
   const blind = depthAwareEngine(c.fen());
   const quick = await screenedCandidates(blunderGame, (f, d, m) => blind.analyse(f, d, m), cfg);
-  assert.equal(quick.threats.length, 0);
+  assert.equal(quick.length, 0);
   const phases = [];
   const deck = await new Scan({ username: "me", games, store, cfg, evaluator: new Evaluator({ store, pool: new EnginePool([depthAwareEngine(c.fen())]) }),
     onUpdate: (u) => phases.push([u.phase, u.deck.length]) }).run();

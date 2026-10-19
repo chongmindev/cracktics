@@ -64,8 +64,7 @@ def main(argv: list[str] | None = None) -> int:
             summary = f"{len(out)} games"
         else:
             out = build_items(games, eng, cfg)
-            n_threat = sum(i["kind"] == "threat" for i in out)
-            summary = f"{n_threat} threat, {len(out) - n_threat} safe"
+            summary = f"{len(out)} mistakes to replay"
         Path(a.out).write_text(json.dumps(out, indent=1))
         print(f"{summary} -> {a.out} (engine cache: {eng.hits} hits, {eng.misses} searches)")
     return 0

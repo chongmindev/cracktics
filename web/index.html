@@ -59,6 +59,7 @@
       </svg><span>Cracktics</span></a>
     <nav class="tools" aria-label="Tools">
       <a href="./" aria-current="page">Drill</a>
+      <a href="openings/">Openings</a>
       <a href="scout/">Scout</a>
     </nav>
     </div>
@@ -82,19 +83,18 @@
     <div class="stage">
       <div class="hero">
         <div>
-          <p class="label">Blunder-check trainer</p>
-          <h1 id="hero-title"><span class="fit" data-fit="0.95">See their reply</span><span class="fit em" data-fit="0.75">before</span><span class="fit" data-fit="0.78">you move.</span></h1>
+          <p class="label">Mistake trainer</p>
+          <h1 id="hero-title"><span class="fit" data-fit="0.95">Find the move</span><span class="fit em" data-fit="0.75">you</span><span class="fit" data-fit="0.78">missed.</span></h1>
         </div>
         <div>
           <div class="hero-rule" aria-hidden="true"></div>
-          <p>Built from the blunders in <b>your own games.</b></p>
+          <p>Built from the mistakes in <b>your own games.</b></p>
         </div>
       </div>
       <div class="boardbox">
         <div class="board" id="board" role="grid" aria-label="Chess board"></div>
         <svg class="arrows" id="arrows" viewBox="0 0 8 8" aria-hidden="true"></svg>
         <div class="pop" id="pop" aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></div>
-        <div class="rewind-tag" aria-hidden="true"><svg class="icon"><use href="#i-rewind"/></svg>Rewind</div>
       </div>
     </div>
 
@@ -167,8 +167,8 @@
           </ul><p>Your finished games, newest first</p></div></li>
         <li tabindex="0"><h2>Scan</h2><span class="label">With Stockfish</span>
           <div class="peek" aria-hidden="true"><div class="mini scanning"><i class="mp " style="--f:4;--r:1;background-image:url(pieces/wK.svg)"></i><i class="mp " style="--f:0;--r:1;background-image:url(pieces/wR.svg)"></i><i class="mp " style="--f:1;--r:2;background-image:url(pieces/wP.svg)"></i><i class="mp " style="--f:5;--r:2;background-image:url(pieces/wP.svg)"></i><i class="mp " style="--f:6;--r:8;background-image:url(pieces/bK.svg)"></i><i class="mp " style="--f:3;--r:4;background-image:url(pieces/bN.svg)"></i><i class="flag" style="--f:3;--r:4"></i><i class="sweep"></i></div><p>Stockfish checks every move you made</p></div></li>
-        <li tabindex="0"><h2>Drill</h2><span class="label">Find the punishment</span>
-          <div class="peek" aria-hidden="true"><div class="mini"><i class="mp " style="--f:4;--r:1;background-image:url(pieces/wK.svg)"></i><i class="mp " style="--f:0;--r:1;background-image:url(pieces/wR.svg)"></i><i class="mp " style="--f:1;--r:2;background-image:url(pieces/wP.svg)"></i><i class="mp " style="--f:5;--r:2;background-image:url(pieces/wP.svg)"></i><i class="mp " style="--f:6;--r:8;background-image:url(pieces/bK.svg)"></i><i class="mp jump" style="--f:3;--r:4;background-image:url(pieces/bN.svg)"></i><svg class="mini-arrow" viewBox="0 0 8 8"><defs><marker id="mini-head" viewBox="0 0 4 4" refX="2" refY="2" markerWidth="2.2" markerHeight="2.2" orient="auto"><path d="M0 0 4 2 0 4Z"/></marker></defs><path d="M3.5 4.5 2.6 6.3" marker-end="url(#mini-head)"/></svg><i class="tick">✓</i></div><p>Find the move that punishes yours: Nc2+ forks</p></div></li>
+        <li tabindex="0"><h2>Drill</h2><span class="label">Find the better move</span>
+          <div class="peek" aria-hidden="true"><div class="mini"><i class="mp " style="--f:4;--r:1;background-image:url(pieces/wK.svg)"></i><i class="mp " style="--f:0;--r:1;background-image:url(pieces/wR.svg)"></i><i class="mp " style="--f:1;--r:2;background-image:url(pieces/wP.svg)"></i><i class="mp " style="--f:5;--r:2;background-image:url(pieces/wP.svg)"></i><i class="mp " style="--f:6;--r:8;background-image:url(pieces/bK.svg)"></i><i class="mp jump" style="--f:3;--r:4;background-image:url(pieces/bN.svg)"></i><svg class="mini-arrow" viewBox="0 0 8 8"><defs><marker id="mini-head" viewBox="0 0 4 4" refX="2" refY="2" markerWidth="2.2" markerHeight="2.2" orient="auto"><path d="M0 0 4 2 0 4Z"/></marker></defs><path d="M3.5 4.5 2.6 6.3" marker-end="url(#mini-head)"/></svg><i class="tick">✓</i></div><p>Back to before your mistake: find the move you missed</p></div></li>
       </ol>
 
       <div class="status" id="status" hidden aria-live="polite">
@@ -191,37 +191,20 @@
       <section class="drill" aria-label="Position">
         <div class="meta" id="meta"></div>
         <div class="step-row"><p class="step label" id="step"></p><span class="material label" id="material" title="Material on the board for you (P1 N3 B3 R5 Q9)"></span></div>
-        <div class="played">
-          <span class="label" id="played-label">You played</span>
-          <span class="played-move" id="played"></span>
-        </div>
         <p class="question" id="question"></p>
-
-        <div class="scan" id="scan" role="group" aria-label="Scan the board">
-          <span class="label">Scan</span>
-          <button class="chip" type="button" data-kind="checks" aria-pressed="false"><b>?</b>Checks</button>
-          <button class="chip" type="button" data-kind="captures" aria-pressed="false"><b>?</b>Captures</button>
-          <button class="chip" type="button" data-kind="loose" aria-pressed="false"><b>?</b>Loose</button>
-        </div>
+        <p class="context label" id="context"></p>
 
         <div class="answer" id="actions">
           <span class="label">Answer</span>
-          <span class="hint-move">Move their piece on the board</span>
-          <span class="or">or</span>
-          <button class="btn" id="btn-safe" type="button">Nothing works</button>
-          <button class="btn ghost reveal" id="btn-reveal" type="button" hidden>Reveal</button>
-        </div>
-
-        <div class="answer" id="fix-row" hidden>
-          <span class="label">Fix</span>
           <span class="hint-move">Move your piece on the board</span>
+          <button class="btn ghost reveal" id="btn-hint" type="button">Hint</button>
           <button class="btn ghost reveal" id="btn-show" type="button" hidden>Show me</button>
         </div>
 
         <p class="note" id="note" role="status" hidden></p>
 
         <div id="feedback"></div>
-        <div class="btns"><button class="btn primary" id="btn-fix" type="button" hidden>Fix your move<svg class="icon"><use href="#i-next"/></svg></button><button class="btn primary" id="btn-next" type="button" hidden>Next<svg class="icon"><use href="#i-next"/></svg></button></div>
+        <div class="btns"><button class="btn primary" id="btn-next" type="button" hidden>Next<svg class="icon"><use href="#i-next"/></svg></button></div>
         <span class="visually-hidden" id="device-side"></span>
       </section>
 

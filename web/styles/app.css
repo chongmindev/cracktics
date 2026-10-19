@@ -498,3 +498,9 @@ svg.arrows polygon { fill: var(--ink); }
 .tools a:hover { color: var(--ink); border-bottom-color: var(--accent); }
 .tools a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--ink); }
 @media (max-width: 420px) { .bar-left { gap: 12px; } .tools { gap: 10px; } .wordmark span { display: none; } }
+
+/* The mistake puzzle: a line of context under the question, other good moves and the game move's link in the feedback */
+.context { margin: -6px 0 0; color: var(--ink-muted); text-transform: none; letter-spacing: 0; font: italic 400 1rem var(--f-body); }
+.context:empty { display: none; }
+.fb .also { margin: 0; }
+.fb .see-played { justify-self: start; text-transform: none; }
