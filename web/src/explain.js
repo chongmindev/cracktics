@@ -9,6 +9,8 @@ import { Chess } from "chess.js";
 const NAME = { k: "king", q: "queen", r: "rook", b: "bishop", n: "knight", p: "pawn" };
 const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 const MAX_LINE = 6;   // plies of the engine line to walk through at most
+const PLAN_LINE = [6, 12];   // a game plan's line after your reply: at least / at most this many plies
+const THREAT_MIN = 2;   // a threat worth naming wins at least this much (P1 N3 B3 R5 Q9)
 
 /** Material on the board, White minus Black, in pawns (P1 N3 B3 R5 Q9). */
 export function material(fen) {
@@ -41,13 +43,16 @@ function play(fen, ucis) {
   return out;
 }
 
-/** Cut a line where it goes quiet: after a move that is not a capture or check, with no capture next. */
-function quietCut(plies, min = 2) {
-  for (let i = min - 1; i < Math.min(plies.length, MAX_LINE); i++) {
+/**
+ * Cut a line where it goes quiet: after a move that is not a capture or check, with no capture next.
+ * calm(ply), when given, must also hold there (the game plan: the move threatens nothing more).
+ */
+function quietCut(plies, min = 2, max = MAX_LINE, calm = () => true) {
+  for (let i = min - 1; i < Math.min(plies.length, max); i++) {
     const m = plies[i].move, next = plies[i + 1]?.move;
-    if (!m.captured && !m.san.includes("+") && !next?.captured) return plies.slice(0, i + 1);
+    if (!m.captured && !m.san.includes("+") && !next?.captured && calm(plies[i])) return plies.slice(0, i + 1);
   }
-  return plies.slice(0, MAX_LINE);
+  return plies.slice(0, max);
 }
 
 /** Squares strictly between a and b on a rank, file or diagonal; [] if they don't share a line. */
@@ -95,6 +100,106 @@ function caption(p, prev, me) {
   else return mine ? "A quiet follow-up." : `${who}'s best reply.`;
   if (m.san.includes("+") && !/^Check|checks$/.test(text)) text += " with check";
   return `${text}${alsoIng ? `, ${alsoIng}` : ""}.`;
+}
+
+/** `fen` with `color` to move (no en passant), or null when the side to move is in check (it can't pass). */
+function turned(fen, color) {
+  const f = fen.split(" ");
+  if (f[1] === color) return fen;
+  if (new Chess(fen).inCheck()) return null;
+  f[1] = color; f[3] = "-";
+  return f.join(" ");
+}
+
+/**
+ * The best thing `color` threatens in `fen`, as if it could move now: {from, to, piece, captured, gain, mate, san}
+ * or null. A capture's gain counts one recapture (an undefended piece, or one worth more than its taker); a mate
+ * threat has gain Infinity and its SAN. Pins and x-rays aren't followed.
+ */
+export function threat(fen, color, min = THREAT_MIN) {
+  const g = new Chess(fen), them = color === "w" ? "b" : "w";
+  let best = null;
+  const t = turned(fen, color);   // null when `color` is giving check: then only captures count
+  if (t) for (const m of new Chess(t).moves({ verbose: true }))
+    if (m.san.endsWith("#")) return { from: m.from, to: m.to, piece: m.piece, captured: m.captured, gain: Infinity, mate: true, san: m.san };
+  const by = (sq, c) => g.attackers(sq, c).map((from) => ({ from, v: SWAP[g.get(from).type] })).sort((a, c2) => a.v - c2.v);
+  for (const row of g.board()) for (const x of row) {
+    if (!x || x.color !== them || x.type === "k") continue;
+    const atk = by(x.square, color);
+    if (!atk.length) continue;
+    const gain = swap(VALUE[x.type], atk.map((a) => a.v), by(x.square, them).map((d) => d.v));
+    if (gain >= min && (!best || gain > best.gain))
+      best = { from: atk[0].from, to: x.square, piece: g.get(atk[0].from).type, captured: x.type, gain, mate: false };
+  }
+  return best;
+}
+
+const SWAP = { ...VALUE, k: 100 };   // in an exchange the king captures last, and never into a guarded square
+
+/** What capturing a piece worth `target` wins when both sides take in turn, cheapest first, and either may stop. */
+function swap(target, atk, def) {
+  const gain = [target], lists = [atk, def], at = [1, 0];
+  let onSquare = atk[0], turn = 1;
+  while (at[turn] < lists[turn].length) {
+    gain.push(onSquare - gain.at(-1));
+    onSquare = lists[turn][at[turn]++];
+    turn ^= 1;
+  }
+  for (let i = gain.length - 1; i > 0; i--) gain[i - 1] = -Math.max(-gain[i - 1], gain[i]);
+  return gain[0];
+}
+
+/** "diagonal" / "file" / "rank" between two squares on one line. */
+const lineKind = (a, c) => (a[0] === c[0] ? "file" : a[1] === c[1] ? "rank" : "diagonal");
+
+/**
+ * Why a move of the game plan's line is played: what it takes, what threat it answers, what it threatens next,
+ * and where material stands on the board. me: your colour.
+ */
+function why(p, prev, next, me) {
+  const m = p.move, mine = m.color === me, opp = m.color === "w" ? "b" : "w";
+  const S = mine ? "You" : side(m.color), v = (x) => (mine ? x : `${x}s`);
+  const own = mine ? "your" : "their", theirs = mine ? "their" : "your";
+  if (m.san.endsWith("#")) return mine ? "Checkmate." : `${S} mates.`;
+
+  // What the other side threatened before this move, and whether this move dealt with it.
+  const was = threat(p.before, opp), still = threat(p.after, opp);
+  const answered = was && (!still || (!still.mate && (was.mate || still.gain < was.gain)));
+  const checked = new Chess(p.before).inCheck();
+  // What this move threatens that it couldn't before.
+  const t = threat(p.after, m.color), had = threat(p.before, m.color);
+  // An even trade taken straight back: its threats don't count. (A sacrifice's threats are the point of it.)
+  const midTrade = next?.move.captured && next.move.to === m.to;
+  const even = midTrade && m.captured && VALUE[m.captured] >= VALUE[m.piece];
+  const fresh = t && !even && !(had && had.from === t.from && had.to === t.to);
+  const threatText = fresh ? (t.mate ? `mate with ${b(t.san)}` : `to win ${theirs} ${NAME[t.captured]} on ${t.to}`) : "";
+
+  let main;
+  if (m.captured && prev?.move.captured && prev.move.to === m.to) main = `${S} ${v("take")} back`;
+  else if (m.captured) main = `${S} ${v("take")} ${theirs} ${NAME[m.captured]}`;
+  else if (m.promotion) main = `${S} ${v("make")} a ${NAME[m.promotion]}`;
+  else if (checked) main = `${S} ${v("get")} out of check`;
+  else if (answered && was.mate) main = `${S} ${v("stop")} mate on ${was.to}`;
+  else if (answered && was.to === m.from) main = `${S} ${v("get")} ${own} ${NAME[m.piece]} out of the attack`;
+  else if (answered && between(was.from, was.to).includes(m.to)) main = `${S} ${v("block")} the attack on ${own} ${NAME[was.captured]}`;
+  else if (answered && new Chess(p.after).attackers(was.to, m.color).length > new Chess(p.before).attackers(was.to, m.color).length)
+    main = `${S} ${v("defend")} ${own} ${NAME[was.captured]} on ${was.to}`;
+  else if (answered) main = `${S} ${v("block")} the attack on ${own} ${NAME[was.captured]}`;
+  else if (m.flags.includes("k") || m.flags.includes("q")) main = `${S} ${v("castle")}`;
+  else if (m.san.includes("+")) main = `${S} ${v("give")} check`;
+  else if (fresh) main = "";
+  else if ("nb".includes(m.piece) && m.from[1] === (m.color === "w" ? "1" : "8")) main = `${S} ${v("bring")} out ${own} ${NAME[m.piece]}`;
+  else main = null;
+
+  if (m.san.includes("+") && main && !/check$/.test(main)) main += " with check";
+  let text = main === "" ? `${S} ${v("threaten")} ${threatText}` : main ? (fresh ? `${main}, and ${v("threaten")} ${threatText}` : main) : null;
+
+  const d = (me === "w" ? 1 : -1) * material(p.after);   // as it stands on the board
+  if (text == null) return mine ? (d > 0 ? `A calm move: you stay ${amount(d)} up.` : "A quiet move that keeps your edge.")
+    : d > 0 ? `${S}'s best try, still ${amount(d)} down.` : `${S}'s best reply.`;
+  text += ".";
+  if (m.captured && !midTrade) text += d > 0 ? ` You're ${amount(d)} up.` : d < 0 ? ` You're ${amount(-d)} down for now.` : " Material is level.";
+  return text;
 }
 
 /**
@@ -244,11 +349,14 @@ export function refutation({ before, habit, line }) {
   const sign = me === "w" ? 1 : -1;
   const myMate = line?.mate != null && sign * line.mate > 0 ? sign * line.mate : null;
 
+  const edge = line?.cp != null ? `${sign * line.cp > 0 ? "+" : ""}${(sign * line.cp / 100).toFixed(1)}` : null;
+  // How a long-range piece gets there: "from d1 along the open diagonal" (the squares between are empty).
+  const reach = r && "bqr".includes(r.piece) && between(r.from, r.to).length ? ` from ${r.from} along the open ${lineKind(r.from, r.to)}` : "";
   let reason;
   if (!r) reason = "Stockfish doesn't like it.";
   else if (r.san.endsWith("#")) reason = `Allows ${b(r.san)}, mate.`;
   else if (r.captured && r.to === hm.to)
-    reason = `Their ${NAME[hm.piece]} goes to ${hm.to}, where your ${NAME[r.piece]} takes it` +
+    reason = `Their ${NAME[hm.piece]} goes to ${hm.to}, where your ${NAME[r.piece]} takes it${reach}` +
       (!guards(r.to) ? ", and nothing defends it." : VALUE[r.piece] < VALUE[r.captured] ? ": taking back still leaves them down." : ".");
   else if (r.captured && H.attackers(r.to, them).includes(hm.from) && !A.attackers(r.to, them).includes(hm.to))
     reason = `Their ${NAME[hm.piece]} on ${hm.from} was guarding the ${NAME[r.captured]} on ${r.to}; after ${b(hm.san)} ` +
@@ -258,7 +366,13 @@ export function refutation({ before, habit, line }) {
   else if (r.captured && !guards(r.to)) reason = `Leaves their ${NAME[r.captured]} on ${r.to} undefended, and you take it.`;
   else if (r.captured && VALUE[r.piece] < VALUE[r.captured])
     reason = `Lets your ${NAME[r.piece]} take their ${NAME[r.captured]}: even if they take back, they're down.`;
-  else if (r.captured) reason = `Lets you take their ${NAME[r.captured]} on ${r.to}.`;
+  else if (r.captured && myMate) reason = `Lets your ${NAME[r.piece]} take their ${NAME[r.captured]} on ${r.to}, and mate follows.`;
+  else if (r.captured) {
+    // A small capture that also hits something bigger is the real point: say so.
+    const t = threat(plies[0].after, me);
+    reason = `Lets your ${NAME[r.piece]} take their ${NAME[r.captured]} on ${r.to}${reach}` +
+      (t && !t.mate && t.gain > VALUE[r.captured] ? ` and hit their ${NAME[t.captured]} on ${t.to}.` : ".");
+  }
   else {
     const hits = targets(plies[0].after, r.to).filter((x) => x.type !== "k").map((x) => NAME[x.type]);
     if (myMate) reason = `Allows ${b(r.san)}, and mate follows.`;
@@ -266,17 +380,22 @@ export function refutation({ before, habit, line }) {
     else if (hits.length > 1) reason = `Allows ${b(r.san)}, forking their ${hits[0]} and ${hits[1]}.`;
     else if (hits.length) reason = `Allows ${b(r.san)}, attacking their ${hits[0]}.`;
     else if (r.san.includes("+")) reason = `Allows ${b(r.san)}, with check.`;
-    else reason = `Allows ${b(r.san)}.`;
+    else reason = `Allows ${b(r.san)}. Nothing falls at once, but Stockfish has you clearly better${edge ? ` (${edge})` : ""}: the line shows why.`;
   }
 
-  const shown = r ? quietCut(plies, 3) : [];
+  // The full line: past the win of material, until neither side threatens anything more.
+  const shown = r ? quietCut(plies, PLAN_LINE[0], PLAN_LINE[1], (p) => !threat(p.after, p.move.color) && !threat(p.after, me)) : [];
   const steps = [{ ply: { move: hm, before, after: afterH }, text: reason },
-    ...shown.map((p, i) => ({ ply: p, text: caption(p, i ? shown[i - 1] : null, me) }))];
+    ...shown.map((p, i) => ({ ply: p, text: why(p, shown[i - 1], shown[i + 1], me) }))];
   const end = shown.at(-1)?.after ?? afterH;
-  const d = sign * (material(end) - material(before));
-  const edge = line?.cp != null ? `${sign * line.cp > 0 ? "+" : ""}${(sign * line.cp / 100).toFixed(1)}` : null;
+  // Material as it stands on the board (a = at the end of the line); d = what the line changed.
+  const a = sign * material(end), d = a - sign * material(before);
+  const better = `you're clearly better${edge ? ` (${edge})` : ""}`;
   const summary = myMate ? `Mate in ${myMate}.`
-    : d > 0 ? `You come out ${amount(d)} up.`
-    : `Material ${d < 0 ? `costs you ${amount(-d)}` : "stays level"} for now, but you're clearly better${edge ? ` (${edge})` : ""}.`;
+    : d > 0 && a === d ? `You come out ${amount(d)} up.`
+    : d > 0 && a > 0 ? `You win ${amount(d)} and end ${amount(a)} up.`
+    : d > 0 ? `You win back ${amount(d)}, and ${better}.`
+    : a > 0 ? `You stay ${amount(a)} up, and ${better}.`
+    : `${a < 0 ? `You're ${amount(-a)} down for now` : "Material is level"}, but ${better}.`;
   return { reason, idea: shown.length > 0, steps, summary };
 }

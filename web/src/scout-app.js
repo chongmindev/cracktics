@@ -400,7 +400,7 @@ function openPlan(i) {
       `${esc(username)} has gone this way about ${pct(p.odds / share(p.move))} of the time. ` : ""}` +
       `Once there, they played <b>${esc(p.move.san)}</b> in ${p.move.n} of ${p.node.n} games, and it costs them about ${(p.loss / 100).toFixed(1)} pawns.</p>` +
     (roadSteps.length ? `<div class="road"><span class="label">The road</span><nav class="crumbs">${chips}</nav>${offHtml}</div>` : "") +
-    `<div class="walk plan-walk"><p class="label">The punishment</p><ol class="walk-steps">${rows}</ol>` +
+    `<div class="walk plan-walk"><p class="label">Why it's punishable, move by move</p><ol class="walk-steps">${rows}</ol>` +
       (w?.summary ? `<p class="walk-sum">${esc(w.summary)}</p>` : "") +
       `<div class="plan-nav"><button class="btn ghost walk-prev" type="button" aria-label="Previous move" title="Previous move (←)">` +
       `<svg class="icon"><use href="#i-prev"/></svg></button><button class="btn ghost walk-step" type="button" title="Next move (→)"></button></div></div>` +

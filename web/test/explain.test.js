@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { between, walkthrough, punishment, refutation } from "../src/explain.js";
+import { Chess } from "chess.js";
+import { between, walkthrough, punishment, refutation, threat } from "../src/explain.js";
 
 const plain = (s) => s.replace(/<[^>]+>/g, "");
 const SCHOLAR = "r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3";   // Black to move, f7 under fire
@@ -69,7 +70,7 @@ test("refutation: what their habit gives you, then your reply and the line", () 
   const w = refutation({ before, habit: "Bg4", line: { pv: ["f3g4", "e7e5"], cp: 320 } });
   assert.equal(plain(w.reason), "Their bishop goes to g4, where your queen takes it, and nothing defends it.");
   assert.deepEqual(w.steps.map((s) => s.ply.move.san), ["Bg4", "Qxg4", "e5"]);
-  assert.equal(w.steps[1].text, "You take the bishop.");
+  assert.equal(w.steps[1].text, "You take their bishop. You're a piece up.");
   assert.equal(w.summary, "You come out a piece up.");
 });
 
@@ -77,4 +78,26 @@ test("refutation: a habit that allows mate", () => {
   const w = refutation({ before: SCHOLAR, habit: "Nf6", line: { pv: ["h5f7"], mate: 1 } });
   assert.equal(plain(w.reason), "Allows Qxf7#, mate.");
   assert.equal(w.summary, "Mate in 1.");
+});
+
+test("refutation: the full line says why each move is played", () => {
+  const g = new Chess();
+  "e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 d5 exd5".split(" ").forEach((m) => g.move(m));
+  const w = refutation({ before: g.fen(), habit: "Nxd5",
+    line: { pv: ["g5f7", "e8f7", "d1f3", "f7e6", "b1c3", "c6b4", "f3e4", "c7c6", "a2a3"], cp: 150 } });
+  assert.equal(plain(w.reason), "Lets your knight take their pawn on f7 and hit their queen on d8.");
+  assert.deepEqual(w.steps.slice(1).map((s) => [s.ply.move.san, plain(s.text)]), [
+    ["Nxf7", "You take their pawn, and threaten to win their queen on d8."],
+    ["Kxf7", "Black takes back. You're two pawns' worth down for now."],
+    ["Qf3+", "You give check, and threaten to win their knight on d5."],
+    ["Ke6", "Black gets out of check."],
+    ["Nc3", "You threaten to win their knight on d5."],
+    ["Nb4", "Black defends their knight on d5."],
+  ]);
+});
+
+test("threat: counts the exchange, so a piece attacked twice and defended once is won", () => {
+  const fen = "r1bq1b1r/ppp2kpp/2n5/3np3/2B5/5Q2/PPPP1PPP/RNB1K2R b KQ - 2 6";   // after 6.Qf3+ in the line above
+  assert.deepEqual((({ to, captured, gain }) => ({ to, captured, gain }))(threat(fen, "w")), { to: "d5", captured: "n", gain: 3 });
+  assert.equal(threat(fen, "b"), null);
 });

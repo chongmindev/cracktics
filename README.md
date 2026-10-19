@@ -25,7 +25,8 @@ the colour you'll have; it reads their finished games and shows:
 - **Game plan:** moves they've made at least twice that give something away (Stockfish checks their 60 most
   played), as full lines, best bets first (how likely they walk into it, times
   what it costs): your moves to get there, how often they follow, where they can go another way, their habit, and
-  Stockfish's punishment, stepped on the board a move at a time with a line on what each move does.
+  Stockfish's full punishing line, stepped on the board a move at a time, with why each move is played (what it
+  takes, the threat it answers or makes, and where material stands).
 - **Weak spots:** lines you can steer into where they score well below their usual, and their results by opening.
 - **Explorer:** their opening tree from the start: what they play at each move, how often, how often they won
   after it, and Stockfish's verdict on it (best, good, dubious, mistake, blunder, with what it gives away),

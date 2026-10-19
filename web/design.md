@@ -188,7 +188,7 @@ Same frame, tokens and components as the drill; extra styles in `styles/scout.cs
 
 | Part | Class | Notes |
 |---|---|---|
-| Game plan | `.road`, `.plan-walk` | first tab. A list of plans (costly habit, its road, "Costs N", odds), then one plan: the road as chips (your moves in accent, theirs with how often), where they can go another way, then the punishment as `.walk-steps` rows like the drill's idea. The board shows the next move as an arrow; Next move steps through road, habit and line |
+| Game plan | `.road`, `.plan-walk` | first tab. A list of plans (costly habit, its road, "Costs N", odds), then one plan: the road as chips (your moves in accent, theirs with how often), where they can go another way, then "Why it's punishable, move by move" as `.walk-steps` rows: why their move fails, then Stockfish's line (up to 12 plies, until neither side threatens anything) with a reason per move: what it takes, the threat it answers or makes, and material as it stands. The board shows the next move as an arrow; ← → (Home / End) and the ← / Next move buttons step through road, habit and line |
 | Tools nav | `.tools` | in the bar beside the wordmark: Drill, Scout; the current page underlined in ink. Under 420px the wordmark shows only the knight |
 | You'll have | `.seg` | White / Black as two joined buttons (pick one) |
 | Summary | `.scout-counters` | the inverted band: games, how often they win, how predictable, where they leave book |
