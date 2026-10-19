@@ -5,9 +5,10 @@
 
 import { Chess } from "chess.js";
 import { Board } from "./board.js";
+import { liftPieces } from "./drag.js";
 import { EnginePool, Evaluator, LichessCloud } from "./evals.js";
 import { numbered as plyText, openingMiss } from "./explain.js";
-import { at, candidates, chooseMove, families, kidsOf, lossOf, nameAt, pathKey, questTree, rankText, repertoire, scoreOf, turnOf } from "./quest.js";
+import { at, candidates, chooseMove, families, kidsOf, lossOf, nameAt, pathKey, posKey, questTree, rankText, repertoire, scoreOf, turnOf } from "./quest.js";
 import { Select } from "./select.js";
 import { sound } from "./sound.js";
 import { IdbStore, MemoryStore } from "./store.js";
@@ -26,6 +27,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ALL = "__all__";   // the opening select's "every opening, from move one"
 
 let book = null, fams = [], store = null, board = null, evaluate = null, analysePv = null;
+let verdicts = null;   // openings/moves.json: {pos: {position key: {san: loss | [loss, reply]}}}, every move at every quest position
 let q = null;   // the quest: {fam, me, entry, leaves, count, prog, key, path, game, sel, marks, misses, firstTry, busy, phase, last, view}
 
 async function openStore() {
@@ -178,10 +180,17 @@ async function answer(m) {
   }
   let loss, reply = null;
   const child = nd.k?.[m.san];
-  if (child) { loss = lossOf(nd, child, q.me); reply = child.b || null; }
+  // One verdict per position and move, worked out ahead of time (tools/book-moves.mjs), so it never changes
+  // between visits or depends on which engine answered. Your repertoire move is always right.
+  const known = m.san === rep?.san ? undefined : verdicts?.pos[posKey(q.game.fen())]?.[m.san];
+  if (m.san === rep?.san) loss = child ? lossOf(nd, child, q.me) : 0;
+  else if (known !== undefined) {
+    loss = Array.isArray(known) ? known[0] : known;
+    reply = Array.isArray(known) ? known[1] : child?.b || null;
+  } else if (child) { loss = lossOf(nd, child, q.me); reply = child.b || null; }
   else {
     q.busy = true;
-    note(`Checking <b>${esc(m.san)}</b>: it isn't in the book…`);
+    note(`Checking <b>${esc(m.san)}</b>…`);
     paint();
     try {
       const g = new Chess(q.game.fen());
@@ -194,7 +203,7 @@ async function answer(m) {
     q.busy = false;
     if (loss == null) { paint(); return note("Couldn't check that move. Try another."); }
   }
-  if (loss <= O.answer_tolerance) return accept(m, rep, loss, null, child);
+  if (m.san === rep?.san || loss <= O.answer_tolerance) return accept(m, rep, loss, null, child);
   const popular = kidsOf(nd)[0];
   const trapped = popular && popular.san === m.san && q.log.at(-1)?.cand?.kinds.includes("trap");
   miss(m, trapped ? `<b>${esc(m.san)}</b> is the move most people play here, and it's the trap: it gives away ${pawns(loss)}.`
@@ -424,6 +433,11 @@ async function main() {
   document.fonts?.ready.then(fitHero);
   new ResizeObserver(fitHero).observe(document.querySelector(".stage"));
   board = new Board($("board"), $("arrows"));
+  liftPieces(board.el, {
+    canLift: (s) => !!q && !q.busy && q.phase === "play" && turnOf(q.path) === q.me && q.game.get(s)?.color === q.game.turn(),
+    tap: (s) => onTap(s),
+    selected: () => q?.sel ?? null,
+  });
   store = await openStore();
   setStatus("Loading the opening book…");
   try {
@@ -431,6 +445,8 @@ async function main() {
     if (!res.ok) throw new Error(`the book answered ${res.status}`);
     const data = await res.json();
     book = data.root;
+    // Verdicts load alongside; until they arrive (or if they're missing) moves are judged as before.
+    fetch(new URL("../openings/moves.json", import.meta.url)).then((r) => (r.ok ? r.json() : null)).then((d) => { verdicts = d; }).catch(() => {});
     $("foot-note").textContent = "Moves and results: Lichess open database, CC0";
     $("foot-note").title = data._source;
   } catch (err) {

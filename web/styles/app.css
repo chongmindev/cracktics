@@ -504,3 +504,17 @@ svg.arrows polygon { fill: var(--ink); }
 .context:empty { display: none; }
 .fb .also { margin: 0; }
 .fb .see-played { justify-self: start; text-transform: none; }
+
+/* Picking a piece up (src/drag.js): the lifted copy follows the pointer, larger, shadowed, bobbing a little;
+   the piece left on its square fades while it's in the air. */
+.board.can-lift { touch-action: none; }
+.board[data-lifting] .sq.sel .pc { opacity: 0.25; }
+.sq.drop-over { box-shadow: inset 0 0 0 4px var(--ink); }
+.pc.lifted {
+  position: fixed; left: 0; top: 0; z-index: 1000; pointer-events: none;
+  scale: 1.18; filter: drop-shadow(0 12px 10px rgb(0 0 0 / 0.35));
+  animation: lift-bob 1.3s ease-in-out infinite;
+}
+.pc.lifted.settling { scale: 1; filter: none; animation: none; transition: transform 110ms ease-out, scale 110ms ease-out; }
+@keyframes lift-bob { 0%, 100% { translate: 0 -3px; } 50% { translate: 0 3px; } }
+@media (prefers-reduced-motion: reduce) { .pc.lifted { animation: none; } }

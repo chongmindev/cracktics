@@ -32,8 +32,10 @@ you haven't finished come first, then the ones you answered worst. Progress stay
 
 The book is built once from the [Lichess open database](https://database.lichess.org/) (CC0): 2 million rated
 games from September 2026, both players 1200–2300, blitz and slower, every position played 40+ times, each
-evaluated by Stockfish at depth 16 (`tools/build_book.py`, settings in `[openings]`). A move the book doesn't
-have is judged by the Lichess cloud or Stockfish in your browser.
+evaluated by Stockfish at depth 14 (`tools/build_book.py`, settings in `[openings]`). Every legal move at every
+position a quest can put you in is judged ahead of time the same way, at the same depth (`web/tools/book-moves.mjs`,
+written to `web/openings/moves.json`), so your move gets its verdict at once and the same one every time; only a
+position outside the quests falls back to the Lichess cloud or Stockfish in your browser.
 
 ## Scout
 

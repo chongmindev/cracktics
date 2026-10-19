@@ -10,6 +10,7 @@
 // neighbouring frames slides the piece; captures fade.
 
 import { Chess } from "chess.js";
+import { liftPieces } from "./drag.js";
 import { material, numbered, punishment, walkthrough } from "./explain.js";
 
 export { material };
@@ -66,6 +67,11 @@ export class Trainer {
     els.showMe.addEventListener("click", () => this.show());
     els.next.addEventListener("click", () => this.next());
     els.feedback.addEventListener("click", (e) => { if (e.target.closest(".see-played")) this.whatItAllowed(); });
+    liftPieces(els.board, {
+      canLift: (s) => this.interactive() && this.game.get(s)?.color === this.game.turn(),
+      tap: (s) => this.tap(s),
+      selected: () => this.sel ?? null,
+    });
   }
 
   static freshProgress() { return { boxes: {}, seen: {}, turn: 0, stats: { done: 0, ok: 0, streak: 0 } }; }

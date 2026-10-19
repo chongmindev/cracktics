@@ -15,6 +15,8 @@ export const kidsOf = (nd) => Object.entries(nd?.k || {}).map(([san, node]) => (
 export const share = (kid, parent) => (parent.n ? kid.n / parent.n : 0);
 export const at = (book, path) => path.reduce((nd, san) => nd?.k?.[san], book);
 export const pathKey = (path) => path.join(" ");
+/** A position's key: its FEN without move counters, so transpositions share an entry. */
+export const posKey = (fen) => fen.split(" ").slice(0, 4).join(" ");
 export const turnOf = (path) => (path.length % 2 ? "b" : "w");
 
 /** What `color`'s move from `parent` to `child` gives away against the best, in centipawns (0 or more). */
