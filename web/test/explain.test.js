@@ -101,3 +101,26 @@ test("threat: counts the exchange, so a piece attacked twice and defended once i
   assert.deepEqual((({ to, captured, gain }) => ({ to, captured, gain }))(threat(fen, "w")), { to: "d5", captured: "n", gain: 3 });
   assert.equal(threat(fen, "b"), null);
 });
+
+test("openingMiss: what's wrong with an opening move, without naming the right one", async () => {
+  const { openingMiss } = await import("../src/explain.js");
+  // 1.e4 e5 2.Qh5: early queen, and Nc6 isn't even needed to hit it (Nf6 does).
+  let r = openingMiss({ path: ["e4", "e5"], played: "Qh5", reply: "Nf6" });
+  assert.match(r.reasons[0], /queen out early, and <b>Nf6<\/b> hits it/);
+  assert.equal(r.walk.steps[0].ply.move.san, "Nf6");
+  // 1.e4 e5 2.Nf3 Nc6 3.Ng5: the knight again, with three pieces still at home.
+  r = openingMiss({ path: ["e4", "e5", "Nf3", "Nc6"], played: "Ng5" });
+  assert.match(r.reasons[0], /knight a second time while 3 pieces still sit at home/);
+  // 1.e4 e5 2.Bd3 blocks the d-pawn.
+  r = openingMiss({ path: ["e4", "e5"], played: "Bd3" });
+  assert.ok(r.reasons.some((x) => /in front of your d-pawn/.test(x)));
+  // 1.e4 e5 2.f3: the king's diagonal.
+  r = openingMiss({ path: ["e4", "e5"], played: "f3" });
+  assert.ok(r.reasons.some((x) => /e1 to h4/.test(x)));
+  // 1.e4 e6 2.d4 b6: a flank pawn while the pieces wait.
+  r = openingMiss({ path: ["e4", "e6", "d4"], played: "b6" });
+  assert.match(r.reasons[0], /pawn move on the edge/);
+  // A quiet centre move: nothing to say from the board alone.
+  r = openingMiss({ path: ["e4", "e5", "Nf3", "Nc6"], played: "c3" });
+  assert.deepEqual(r.reasons, []);
+});

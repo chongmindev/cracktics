@@ -14,3 +14,23 @@
 .q-actions { display: flex; gap: 12px; align-items: center; }
 .q-actions:not(:has(:not([hidden]))) { display: none; }
 #q-done .fb p { margin: 6px 0 0; }
+
+/* Been here before: the position, and the lines through it */
+.q-seen { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 0; }
+.q-seen:empty { display: none; }
+.tag.seen { border: 1px solid var(--rule, currentColor); color: var(--ink-muted); font-weight: 500; }
+.tag.seen.new { border-style: dashed; }
+.tag.seen.ok { border-color: var(--ink); color: var(--ink); }
+.tag.seen.no { border-color: var(--accent); color: var(--accent); }
+
+/* Why your move was wrong */
+#q-note { display: grid; gap: 8px; }
+.miss-why { margin: 0; padding-left: 1.1em; display: grid; gap: 2px; }
+.miss-label { margin-top: 2px; }
+#q-note .walk-steps button { font-size: 0.875rem; }
+.miss-stats { color: var(--ink-muted); font-size: 0.875rem; }
+.miss-back { justify-self: start; }
+svg.arrows g.them line { stroke: var(--accent); }
+svg.arrows g.them polygon { fill: var(--accent); }
+svg.arrows g.wrong line { stroke: var(--ink-muted); stroke-dasharray: 0.12 0.1; }
+svg.arrows g.wrong polygon { fill: var(--ink-muted); }

@@ -6,7 +6,8 @@
 import { Chess } from "chess.js";
 import { Board } from "./board.js";
 import { EnginePool, Evaluator, LichessCloud } from "./evals.js";
-import { at, candidates, chooseMove, families, kidsOf, lossOf, nameAt, pathKey, questTree, rankText, repertoire, turnOf } from "./quest.js";
+import { numbered as plyText, openingMiss } from "./explain.js";
+import { at, candidates, chooseMove, families, kidsOf, lossOf, nameAt, pathKey, questTree, rankText, repertoire, scoreOf, turnOf } from "./quest.js";
 import { Select } from "./select.js";
 import { sound } from "./sound.js";
 import { IdbStore, MemoryStore } from "./store.js";
@@ -24,8 +25,8 @@ const pawns = (cp) => (cp / 100).toFixed(1);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ALL = "__all__";   // the opening select's "every opening, from move one"
 
-let book = null, fams = [], store = null, board = null, evaluate = null;
-let q = null;   // the quest: {fam, me, entry, leaves, count, prog, key, path, game, sel, marks, misses, firstTry, busy, phase, last}
+let book = null, fams = [], store = null, board = null, evaluate = null, analysePv = null;
+let q = null;   // the quest: {fam, me, entry, leaves, count, prog, key, path, game, sel, marks, misses, firstTry, busy, phase, last, view}
 
 async function openStore() {
   try { return await IdbStore.open(); } catch { return new MemoryStore(); }
@@ -51,16 +52,33 @@ async function engine() {
   if (evaluate) return evaluate;
   const engines = await Promise.all(Array.from({ length: Math.min(2, poolSize()) }, () =>
     new UciEngine(workerTransport(ENGINE_URL), { mateScore: cfg.engine.mate_score }).init({ Hash: 16 })));
-  const ev = new Evaluator({ store, pool: new EnginePool(engines), cloud: new LichessCloud({ mateScore: cfg.engine.mate_score }) });
+  const pool = new EnginePool(engines);
+  const ev = new Evaluator({ store, pool, cloud: new LichessCloud({ mateScore: cfg.engine.mate_score }) });
   evaluate = async (fen) => (await ev.forGame()(fen, O.book_depth, 1))[0];
+  analysePv = async (fen) => (await pool.analyse(fen, O.book_depth, 1, true))[0];   // the whole line, to explain a miss
   return evaluate;
 }
 
 // ---------- progress ----------
 
-const freshProg = () => ({ done: {}, boxes: {}, seen: {}, turn: 0, traps: {}, stats: { answered: 0, ok: 0, streak: 0 } });
+// done/boxes/seen/times: per line (leaf key). pos: per position you answered (path key) {n: times, ok: right first
+// try last time}. Older saves lack times and pos: withDefaults fills them in.
+const freshProg = () => ({ done: {}, boxes: {}, seen: {}, times: {}, pos: {}, turn: 0, traps: {}, stats: { answered: 0, ok: 0, streak: 0 } });
+const withDefaults = (p) => ({ ...freshProg(), ...p });
 
-async function saveProg() { await store.set(q.key, q.prog); }
+async function saveProg() {
+  await store.set(q.key, q.prog);
+  // The opening list shows how far each quest has got.
+  const index = (await store.get("openings-index")) || {};
+  index[q.key] = { done: q.leaves.filter((l) => q.prog.done[pathKey(l)]).length, total: q.leaves.length };
+  await store.set("openings-index", index);
+}
+
+/** The lines of the quest that go through `path`, and how many of them you've finished. */
+function branch(path) {
+  const under = q.leaves.filter((l) => l.length >= path.length && path.every((s, i) => l[i] === s));
+  return { total: under.length, done: under.filter((l) => q.prog.done[pathKey(l)]).length };
+}
 
 // ---------- the quest ----------
 
@@ -70,7 +88,7 @@ async function startQuest(famName, me) {
   const entry = fam.path;
   const { leaves, count } = questTree(book, entry, me, O, O.book_plies);
   const key = `quest|${fam.name}|${me}`;
-  q = { fam, me, entry, leaves, count, key, prog: (await store.get(key)) || freshProg() };
+  q = { fam, me, entry, leaves, count, key, prog: withDefaults((await store.get(key)) || {}) };
   await store.set("openings-last", { opening: famName, side: me });
   board.white = me === "w";
   $("who").textContent = `${fam.name} as ${COLOR[me]} · ${leaves.length} line${leaves.length === 1 ? "" : "s"}`;
@@ -78,11 +96,12 @@ async function startQuest(famName, me) {
   document.body.dataset.view = "report";
   $("report").hidden = false;
   engine().catch(() => {});   // warm up for moves the book doesn't have
+  await saveProg();
   newLine();
 }
 
 function newLine() {
-  Object.assign(q, { path: [], game: new Chess(), sel: null, marks: {}, misses: 0, firstTry: null, busy: false, phase: "play", last: null, log: [] });
+  Object.assign(q, { path: [], game: new Chess(), sel: null, marks: {}, misses: 0, firstTry: null, busy: false, phase: "play", last: null, log: [], view: null, missToken: null, seenHere: null });
   $("q-done").innerHTML = "";
   $("btn-next").hidden = true;
   paintStats();
@@ -116,6 +135,7 @@ async function step() {
   // Where the book runs out on your turn you still play the engine's move (the quest tree's leaves include it).
   if (!here || (q.path.length >= q.entry.length && !repertoire(here, q.me, q.path, O))) return lineDone();
   q.firstTry = null;
+  q.seenHere = q.path.length >= q.entry.length ? q.prog.pos[pathKey(q.path)] || null : null;   // before this try counts
   paint();
 }
 
@@ -138,6 +158,7 @@ function play(san, who, cand = null) {
 function onTap(s) {
   if (q.busy || q.phase !== "play" || turnOf(q.path) !== q.me) return;
   const p = q.game.get(s);
+  if (q.view) { q.view = null; paint(); }   // back from looking at why a move was wrong
   if (q.sel) {
     const moves = q.game.moves({ verbose: true }).filter((m) => m.from === q.sel && m.to === s);
     // Promotion: a queen (the book has nothing else in the opening).
@@ -155,9 +176,9 @@ async function answer(m) {
     if (m.san === rep.san) return accept(m, rep, 0, `The ${esc(q.fam.name)} starts this way.`);
     return miss(m, `This line is the ${esc(q.fam.name)}: it goes ${esc(numbered(q.entry))}.`);
   }
-  let loss;
+  let loss, reply = null;
   const child = nd.k?.[m.san];
-  if (child) loss = lossOf(nd, child, q.me);
+  if (child) { loss = lossOf(nd, child, q.me); reply = child.b || null; }
   else {
     q.busy = true;
     note(`Checking <b>${esc(m.san)}</b>: it isn't in the book…`);
@@ -168,6 +189,7 @@ async function answer(m) {
       const ev = await engine(), line = await ev(g.fen());
       const before = nd.e ?? (await ev(q.game.fen())).cp;   // every book position has an eval; this is a fallback
       loss = Math.max(0, (q.me === "w" ? 1 : -1) * (before - line.cp));
+      reply = line.move || null;
     } catch { loss = null; }
     q.busy = false;
     if (loss == null) { paint(); return note("Couldn't check that move. Try another."); }
@@ -175,8 +197,8 @@ async function answer(m) {
   if (loss <= O.answer_tolerance) return accept(m, rep, loss, null, child);
   const popular = kidsOf(nd)[0];
   const trapped = popular && popular.san === m.san && q.log.at(-1)?.cand?.kinds.includes("trap");
-  miss(m, trapped ? `<b>${esc(m.san)}</b> is the move most people play here, and it's the trap: it gives away ${pawns(loss)}. Try again.`
-    : `<b>${esc(m.san)}</b> gives away ${pawns(loss)} here. Try again.`);
+  miss(m, trapped ? `<b>${esc(m.san)}</b> is the move most people play here, and it's the trap: it gives away ${pawns(loss)}.`
+    : `<b>${esc(m.san)}</b> gives away ${pawns(loss)} here.`, { reply, child, nd });
 }
 
 function grade(ok) {
@@ -186,22 +208,85 @@ function grade(ok) {
   if (ok) { s.ok++; s.streak++; } else { s.streak = 0; q.misses++; }
   const prev = q.log.at(-1);
   if (prev?.cand?.kinds.includes("trap") && ok) q.prog.traps[pathKey(q.path)] = true;
+  if (q.path.length >= q.entry.length) {
+    const k = pathKey(q.path), was = q.prog.pos[k];
+    q.prog.pos[k] = { n: (was?.n || 0) + 1, ok };
+  }
   saveProg();
 }
 
-function miss(m, html) {
+function miss(m, html, why = null) {
   if (q.firstTry === null) grade(false);
   sound.play("wrong");
   q.marks = { [m.to]: "no" };
-  note(html);
+  q.view = null;
+  note(html + (why ? "" : " Try again."));
   $("btn-show").hidden = false;
   paint();
   board.el.parentElement.animate?.([0, -7, 7, -4, 4, 0].map((x) => ({ transform: `translateX(${x}px)` })), { duration: 300 });
+  if (why) explainMiss(m, html, why);
+}
+
+/** UCI to SAN from `fen`, or null. */
+function sanOf(fen, uci) {
+  try { return new Chess(fen).move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] }).san; } catch { return null; }
+}
+
+/**
+ * Why your move was wrong, under the "gives away" line: what it does wrong on the board, their best answer (stepped
+ * on the board like a drill's line when there's a tactic in it), and how it scores in the book's games.
+ * The board shows your move and their answer; tap the board (or "Try again") to go back and find a better move.
+ */
+async function explainMiss(m, head, { reply, child, nd }) {
+  const token = q.missToken = {}, path = [...q.path], fen = q.game.fen();
+  const after = new Chess(fen); after.move(m.san);
+  const replySan = reply ? sanOf(after.fen(), reply) : null;
+  const stats = child && child.n >= O.book_min_games
+    ? ` In the book's ${child.n.toLocaleString()} games with it, ${COLOR[q.me]} scores ${Math.round(100 * scoreOf(child, q.me))}%` +
+      ` (${Math.round(100 * scoreOf(nd, q.me))}% from this position overall).` : "";
+  let first = true;
+  const render = (w, wait) => {
+    if (q.missToken !== token) return;
+    const { reasons, walk } = w;
+    const rows = walk ? walk.steps.map((st, k) =>
+      `<li><button type="button" data-k="${k}"><b>${esc(plyText(st.ply.before, st.ply.move))}</b><span>${st.text}</span></button></li>`).join("") : "";
+    note(`<span class="miss-head">${head}</span>` +
+      (reasons.length ? `<ul class="miss-why">${reasons.map((r) => `<li>${r}</li>`).join("")}</ul>` : "") +
+      (walk ? `<span class="label miss-label">Their best answer${walk.idea ? ", and what follows" : ""}</span><ol class="walk-steps">${rows}</ol>` +
+        (walk.idea ? `<span class="walk-sum">${esc(walk.summary)}</span>` : "") : "") +
+      (wait ? `<span class="walk-wait">Working out the line…</span>` : "") +
+      (stats ? `<span class="miss-stats">${stats.trim()}</span>` : "") +
+      `<button type="button" class="link-btn miss-back">Try again</button>`);
+    const box = $("q-note");
+    const view = (k) => {
+      const st = walk.steps[k];
+      q.view = { fen: st.ply.after, last: { from: st.ply.move.from, to: st.ply.move.to }, wrong: m, k };
+      box.querySelectorAll(".walk-steps li").forEach((li, j) => li.classList.toggle("on", j === k));
+      paint();
+    };
+    box.querySelector(".walk-steps")?.addEventListener("click", (e) => { const t = e.target.closest("[data-k]"); if (t) view(+t.dataset.k); });
+    box.querySelector(".miss-back").addEventListener("click", () => { q.view = null; box.querySelectorAll(".walk-steps li").forEach((li) => li.classList.remove("on")); paint(); });
+    if (walk && first) view(0);   // show your move and their answer straight away
+    else if (walk && q.view) view(Math.min(q.view.k, walk.steps.length - 1));
+    first = false;
+  };
+  // First from the board and the book alone; then again once the engine's line after their answer is in.
+  render(openingMiss({ path, played: m.san, reply: replySan }), !!replySan);
+  if (!replySan) return;
+  let line = null;
+  try {
+    await engine();
+    const g = new Chess(after.fen()); g.move(replySan);
+    line = await analysePv(g.fen());
+  } catch {}
+  if (q.missToken !== token || q.path.length !== path.length) return;
+  render(openingMiss({ path, played: m.san, reply: replySan, line }), false);
 }
 
 /** Your move counts. If it isn't your repertoire move, say so and carry on with the repertoire move. */
 async function accept(m, rep, loss, why = null, child = null) {
   if (q.firstTry === null) grade(true);
+  q.view = null; q.missToken = null;
   sound.play("right");
   const nd = at(book, q.path), mine = child || nd.k?.[m.san];
   const pct = (x) => (x ? `${Math.max(1, Math.round((100 * x.n) / nd.n))}%` : "");
@@ -239,6 +324,7 @@ function show() {
   const rep = inEntry ? { san: q.entry[q.path.length] } : repertoire(nd, q.me, q.path, O);
   if (!rep) return;
   if (q.firstTry === null) grade(false);
+  q.view = null; q.missToken = null;
   note(`The move here is <b>${esc(rep.san)}</b>.`);
   $("btn-show").hidden = true;
   const played = play(rep.san, "me");
@@ -257,13 +343,15 @@ async function lineDone() {
     p.done[leaf] = true;
     p.boxes[leaf] = q.misses ? 1 : Math.min(5, (p.boxes[leaf] || 0) + 1);
     p.seen[leaf] = p.turn++;
+    p.times[leaf] = (p.times[leaf] || 0) + 1;
   }
   await saveProg();
   const finished = q.leaves.filter((l) => p.done[pathKey(l)]).length;
   const mine = q.log.filter((x) => x.who === "me"), right = mine.filter((x) => x.ok).length;
   const all = finished === q.leaves.length;
   $("q-done").innerHTML = `<div class="fb ${q.misses ? "no" : "ok"}" role="status"><div class="fb-head"><h2>${all ? "Quest complete" : "Line done"}</h2></div>` +
-    `<p>${right} of ${mine.length} of your moves right first time. ${all ? `You've finished all ${q.leaves.length} lines; from here they come back worst-answered first.`
+    `<p>${leaf ? (p.times[leaf] === 1 ? "A new line: first time through. " : `You've finished this line ${p.times[leaf]} times now. `) : ""}` +
+    `${right} of ${mine.length} of your moves right first time. ${all ? `You've finished all ${q.leaves.length} lines; from here they come back worst-answered first.`
       : `${finished} of ${q.leaves.length} lines finished.`}</p></div>`;
   $("btn-next").hidden = false;
   $("btn-next").focus({ preventScroll: true });
@@ -280,7 +368,13 @@ function note(html) {
 function paint() {
   const myTurn = turnOf(q.path) === q.me && q.phase === "play";
   const targets = q.sel && myTurn ? q.game.moves({ verbose: true }).filter((m) => m.from === q.sel).map((m) => m.to) : [];
-  board.draw(q.game.fen(), { last: q.last, onTap, sel: q.sel, targets, marks: q.marks });
+  if (q.view) {
+    // Looking at why your move was wrong: your move (crossed) and their answer, with arrows; tap to go back.
+    const w = q.view.wrong;
+    board.draw(q.view.fen, { last: q.view.last, onTap, marks: { [w.to]: "no" },
+      arrows: [...(q.view.k === 0 ? [{ from: w.from, to: w.to, weight: 0.4, kind: "wrong" }] : []),
+        { from: q.view.last.from, to: q.view.last.to, weight: 1, kind: "them" }] });
+  } else board.draw(q.game.fen(), { last: q.last, onTap, sel: q.sel, targets, marks: q.marks });
   const name = nameAt(book, q.path);
   $("q-name").innerHTML = name ? `<span class="label">${esc(name[0])}</span> ${esc(name[1])}` : "Starting position";
   $("q-line").innerHTML = q.log.map((x, i) =>
@@ -288,7 +382,20 @@ function paint() {
   $("q-prompt").textContent = q.phase === "done" ? "Line done." : q.busy && !myTurn ? `${COLOR[turnOf(q.path)]} to move…`
     : myTurn ? (q.path.length < q.entry.length ? `Play the ${q.fam.name}.` : `Your move as ${COLOR[q.me]}.`) : "";
   $("q-them").textContent = myTurn && q.path.length > q.entry.length ? q.them || "" : "";
+  paintSeen(myTurn);
   paintStats();
+}
+
+/** Have you been here before: this position (and how it went last time), and the lines through it. */
+function paintSeen(myTurn) {
+  const el = $("q-seen");
+  if (!myTurn || q.path.length < q.entry.length) { el.innerHTML = ""; return; }
+  const pos = q.seenHere, br = branch(q.path);
+  const here = !pos ? `<span class="tag seen new">New position</span>`
+    : `<span class="tag seen ${pos.ok ? "ok" : "no"}">Seen ${pos.n === 1 ? "once" : `${pos.n}×`} · ${pos.ok ? "right" : "missed"} last time</span>`;
+  const lines = br.total > 1 ? `<span class="tag seen">${br.done}/${br.total} lines from here done</span>`
+    : br.total === 1 && br.done ? `<span class="tag seen ok">This line: done before</span>` : "";
+  el.innerHTML = here + lines;
 }
 
 function paintStats() {
@@ -301,12 +408,13 @@ function paintStats() {
 
 // ---------- page ----------
 
-function fillOpenings(sel) {
+function fillOpenings(sel, index = {}) {
   const el = $("opening");
+  const prog = (name) => ["w", "b"].map((c) => index[`quest|${name}|${c}`]).map((x, i) => x?.done ? ` · ${x.done}/${x.total} as ${COLOR["wb"[i]]}` : "").join("");
   const top = fams.filter((f) => f.n >= book.n * 0.0005);
   const group = (label, side) => `<optgroup label="${label}">` + top.filter((f) => f.side === side)
-    .map((f) => `<option value="${esc(f.name)}" data-side="${f.side}">${esc(f.name)} · ${esc(numbered(f.path))}</option>`).join("") + "</optgroup>";
-  el.innerHTML = `<option value="${ALL}">Your whole repertoire, from move one</option>` + group("Openings White chooses", "w") + group("Openings Black chooses", "b");
+    .map((f) => `<option value="${esc(f.name)}" data-side="${f.side}">${esc(f.name)} · ${esc(numbered(f.path))}${prog(f.name)}</option>`).join("") + "</optgroup>";
+  el.innerHTML = `<option value="${ALL}">Your whole repertoire, from move one${prog("Whole repertoire")}</option>` + group("Openings White chooses", "w") + group("Openings Black chooses", "b");
   sel.select.value = sel.select.querySelector(`option[value="${CSS.escape(sel.value || "")}"]`) ? sel.value : (top[0]?.name ?? ALL);
 }
 
@@ -334,7 +442,7 @@ async function main() {
   setStatus("");
   fams = families(book);
   const last = await store.get("openings-last");
-  fillOpenings({ select: $("opening"), value: last?.opening });
+  fillOpenings({ select: $("opening"), value: last?.opening }, (await store.get("openings-index")) || {});
   const openingSel = new Select($("opening"));
   const sideFor = () => $("opening").selectedOptions[0]?.dataset.side;
   const pickSide = (s) => { const r = document.querySelector(`input[name=side][value="${s}"]`); if (r) r.checked = true; };
@@ -342,7 +450,11 @@ async function main() {
   $("opening").addEventListener("change", () => { const s = sideFor(); if (s) pickSide(s); });
   openingSel.sync();
   $("btn-go").disabled = false;
-  $("btn-change").addEventListener("click", () => { $("start").classList.add("open"); });
+  $("btn-change").addEventListener("click", async () => {
+    fillOpenings({ select: $("opening"), value: $("opening").value }, (await store.get("openings-index")) || {});
+    openingSel.sync();
+    $("start").classList.add("open");
+  });
   $("start").addEventListener("submit", (e) => {
     e.preventDefault();
     startQuest($("opening").value, sideNow()).catch((err) => {

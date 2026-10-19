@@ -399,3 +399,66 @@ export function refutation({ before, habit, line }) {
     : `${a < 0 ? `You're ${amount(-a)} down for now` : "Material is level"}, but ${better}.`;
   return { reason, idea: shown.length > 0, steps, summary };
 }
+
+const EARLY = 8;   // "early" in the opening: up to this move number
+
+/**
+ * Why a move in the opening is a mistake, from the board alone: a list of short reasons (HTML) about your move,
+ * worded so they don't give the right move away, plus what their best answer does (punishment(), so a tactic is
+ * stepped like a drill's line). path: the SANs before your move; played: your move; reply: their best answer (SAN)
+ * or null; line: the engine's line after the reply {pv, cp, mate} or null.
+ * Returns {reasons: [html], walk: punishment() result or null}.
+ */
+export function openingMiss({ path, played, reply = null, line = null }) {
+  const landed = new Set();   // squares your pieces moved to earlier (and still stand on)
+  const me = path.length % 2 ? "b" : "w", h = new Chess();
+  for (const san of path) {
+    const m = h.move(san);
+    if (m.color === me) { landed.delete(m.from); landed.add(m.to); }
+    else landed.delete(m.to);
+  }
+  const before = h.fen(), pm = new Chess(before).move(played), after = pm.after, A = new Chess(after);
+  const full = +before.split(" ")[5], home = me === "w" ? "1" : "8", pawnHome = me === "w" ? "2" : "7";
+  const minorsHome = ["b", "c", "f", "g"].filter((f) => {
+    const p = A.get(f + home);
+    return p && p.color === me && p.type === (f === "b" || f === "g" ? "n" : "b");
+  }).length;
+  const rm = reply ? (() => { try { return new Chess(after).move(reply); } catch { return null; } })() : null;
+  const reasons = [];
+
+  if (pm.piece === "k" && !pm.flags.includes("k") && !pm.flags.includes("q")) reasons.push("Moves your king, and you can't castle any more.");
+  else if (pm.piece === "q" && !pm.captured && full <= EARLY) {
+    const chased = rm && new Chess(rm.after).attackers(pm.to, rm.color).includes(rm.to);
+    reasons.push(chased ? `Brings your queen out early, and ${b(rm.san)} hits it: they develop and you lose time moving it again.`
+      : "Brings your queen out early, where their pieces can chase it and develop as they go.");
+  } else if (pm.piece !== "p" && landed.has(pm.from) && !pm.captured && minorsHome >= 1)
+    reasons.push(`Moves your ${NAME[pm.piece]} a second time while ${minorsHome === 1 ? "a piece still sits" : `${minorsHome} pieces still sit`} at home.`);
+
+  // A piece in front of an unmoved centre pawn, or a pawn move that shuts in a bishop still at home.
+  const behind = pm.to[0] + pawnHome;
+  if ("nb".includes(pm.piece) && "cde".includes(pm.to[0]) && Math.abs(+pm.to[1] - +pawnHome) === 1 &&
+      A.get(behind)?.type === "p" && A.get(behind)?.color === me)
+    reasons.push(`Puts your ${NAME[pm.piece]} in front of your ${pm.to[0]}-pawn, which can't move now.`);
+  if (pm.piece === "p") {
+    for (const f of ["c", "f"]) {
+      const sq = f + home, bp = A.get(sq);
+      if (bp?.type !== "b" || bp.color !== me) continue;
+      const reach = (fen) => new Chess(turned(fen, me) || fen).moves({ square: sq, verbose: true }).length;
+      const was = reach(before), now = reach(after);
+      if (now === 0 && was > 0) reasons.push(`Shuts in your bishop on ${sq}: it has no squares left.`);
+    }
+    const king = A.board().flat().find((x) => x?.type === "k" && x.color === me)?.square;
+    if (pm.from[0] === "f" && king === "e" + home)
+      reasons.push(`Loosens your king: the diagonal from ${me === "w" ? "e1 to h4" : "e8 to h5"} opens.`);
+    else if ("gh".includes(pm.from[0]) && king && "gh".includes(king[0]))
+      reasons.push("Pushes a pawn in front of your castled king.");
+    else if ("abgh".includes(pm.from[0]) && full <= EARLY && minorsHome >= 2)
+      reasons.push("A pawn move on the edge: it doesn't develop a piece or fight for the centre.");
+  }
+
+  let walk = null;
+  if (rm) {
+    try { walk = punishment({ after, reply, before, played, line }); } catch { walk = null; }
+  }
+  return { reasons, walk };
+}
