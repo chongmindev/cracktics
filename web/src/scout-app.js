@@ -402,12 +402,15 @@ function openPlan(i) {
     (roadSteps.length ? `<div class="road"><span class="label">The road</span><nav class="crumbs">${chips}</nav>${offHtml}</div>` : "") +
     `<div class="walk plan-walk"><p class="label">The punishment</p><ol class="walk-steps">${rows}</ol>` +
       (w?.summary ? `<p class="walk-sum">${esc(w.summary)}</p>` : "") +
-      `<button class="btn ghost walk-step" type="button"></button></div>` +
+      `<div class="plan-nav"><button class="btn ghost walk-prev" type="button" aria-label="Previous move" title="Previous move (←)">` +
+      `<svg class="icon"><use href="#i-prev"/></svg></button><button class="btn ghost walk-step" type="button" title="Next move (→)"></button></div></div>` +
     (links ? `<p class="links label">Their games that went this way: ${links}</p>` : "") +
     `<button type="button" class="link-btn plan-tree">Open in the explorer</button>`;
-  const step = pane.querySelector(".walk-step");
+  const step = pane.querySelector(".walk-step"), prev = pane.querySelector(".walk-prev");
   const show = (f) => {
+    f = Math.max(0, Math.min(frames.length - 1, f));
     plan.at = f;
+    prev.disabled = f === 0;
     const fr = frames[f], next = frames[f + 1];
     const arrows = next ? [{ from: next.move.from, to: next.move.to, weight: 1, kind: next.color === mine ? "yours" : "theirs" }] : [];
     board.draw(fr.fen, { last: fr.move, arrows });
@@ -415,7 +418,7 @@ function openPlan(i) {
     step.innerHTML = f < frames.length - 1 ? `Next move <svg class="icon"><use href="#i-next"/></svg>`
       : `<svg class="icon"><use href="#i-replay"/></svg>From the start`;
   };
-  const plan = state.plan = { i, at: habitAt - 1, show };
+  const plan = state.plan = { i, at: habitAt - 1, show, last: frames.length - 1 };
   pane.onclick = (e) => {
     if (e.target.closest(".plan-back")) { state.plan = null; paintPlans(); goTo(state.node); return; }
     if (e.target.closest(".plan-tree")) { state.plan = null; paintPlans(); openInTree(p.node); return; }
@@ -423,6 +426,7 @@ function openPlan(i) {
     if (o) { state.plan = null; paintPlans(); openInTree(off[+o.dataset.off].k); return; }
     const b = e.target.closest("[data-f]");
     if (b) show(+b.dataset.f);
+    else if (e.target.closest(".walk-prev")) show(plan.at - 1);
     else if (e.target.closest(".walk-step")) show(plan.at < frames.length - 1 ? plan.at + 1 : 0);
   };
   pane.scrollTop = 0;
@@ -504,6 +508,17 @@ async function main() {
     const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
     next.focus();
     next.click();
+  });
+  // ← → step through the open plan's moves (Home / End: its first and last position).
+  document.addEventListener("keydown", (e) => {
+    const plan = state?.plan, step = { ArrowLeft: -1, ArrowRight: 1 }[e.key];
+    if (!plan || $("pane-plan").hidden || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.target.closest?.("input, select, textarea, [role=tab], [role=listbox], [aria-haspopup]")) return;
+    if (step) plan.show(plan.at + step);
+    else if (e.key === "Home") plan.show(0);
+    else if (e.key === "End") plan.show(plan.last);
+    else return;
+    e.preventDefault();
   });
   $("btn-change").addEventListener("click", () => { $("start").classList.add("open"); $("username").focus(); });
   $("start").addEventListener("submit", (e) => {

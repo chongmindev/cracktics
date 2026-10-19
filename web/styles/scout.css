@@ -92,7 +92,9 @@ svg.arrows g.yours polygon { fill: var(--accent); }
 .road .crumb.theirs { color: var(--ink); }
 .road .crumb small { font-size: 0.6875rem; color: var(--ink-muted); }
 .road .crumb.on { background: var(--tint); box-shadow: inset 0 -2px 0 var(--accent); }
-.plan-walk .walk-step { margin-top: 2px; }
+.plan-nav { display: flex; align-items: center; gap: 16px; margin-top: 2px; }
+.plan-nav .walk-prev .icon { width: 16px; height: 16px; }
+.plan-nav .walk-prev:disabled { opacity: 0.35; cursor: default; text-decoration: none; }
 .plan-back, .plan-tree { justify-self: start; }
 .road .off { margin: 2px 0 0; line-height: 1.6; }
 .road .off .link-btn { font-family: var(--f-mono); text-transform: none; letter-spacing: 0; }
