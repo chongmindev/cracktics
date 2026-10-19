@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Chess } from "chess.js";
-import { buildTree, byFamily, habits, keyOf, kidsOf, lineOf, mainLine, numberLine, predictability, rankPlans, road, score, theirMoves, verdictOf, weakSpots } from "../src/prep.js";
+import { buildTree, byFamily, habits, keyOf, kidsOf, lineOf, mainLine, numberLine, predictability, rankPlans, road, score, theirMoves, verdictOf, weakSpots } from "../src/scout.js";
 
 /** A game seen from the opponent ("their" colour), from SAN moves. */
 function game(sans, color, result) {

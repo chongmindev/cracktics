@@ -182,16 +182,16 @@ in the bar). Verdict colors: right = accent with a check, wrong = black with a c
 | `py-24`+ section padding, 8xl–9xl type everywhere | tight panel spacing, oversized type only in the hero | the brief is one screen with every main feature visible |
 | Pricing tiers, testimonials, blog images, drop cap | not used | this is an app, not a marketing page; the bold choices that apply are kept (oversized hero, rule with square, inverted band, 4px rules, zero radius, instant inversions, textures) |
 
-## Match prep (prep/index.html)
+## Scout (scout/index.html)
 
-Same frame, tokens and components as the drill; extra styles in `styles/prep.css`.
+Same frame, tokens and components as the drill; extra styles in `styles/scout.css`.
 
 | Part | Class | Notes |
 |---|---|---|
 | Game plan | `.road`, `.plan-walk` | first tab. A list of plans (costly habit, its road, "Costs N", odds), then one plan: the road as chips (your moves in accent, theirs with how often), where they can go another way, then the punishment as `.walk-steps` rows like the drill's idea. The board shows the next move as an arrow; Next move steps through road, habit and line |
-| Tools nav | `.tools` | in the bar beside the wordmark: Drill, Prep; the current page underlined in ink. Under 420px the wordmark shows only the knight |
+| Tools nav | `.tools` | in the bar beside the wordmark: Drill, Scout; the current page underlined in ink. Under 420px the wordmark shows only the knight |
 | You'll have | `.seg` | White / Black as two joined buttons (pick one) |
-| Summary | `.prep-counters` | the inverted band: games, their score, how predictable, where they leave book |
+| Summary | `.scout-counters` | the inverted band: games, how often they win, how predictable, where they leave book |
 | Tabs | `.tabs` | Weak spots, Explorer, Habits; one pane at a time, scrolling inside the panel on desktop |
 | Rows | `.row` | a line or move, its opening name, a number, and their win / draw / loss as a 4px bar along the bottom (ink / accent-mid / hairline) |
 | Explorer | `.crumbs`, `.opening` | the line so far as clickable moves; arrows on the board for the next moves, heavier = more often; their moves in ink, yours in accent |

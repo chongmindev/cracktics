@@ -1,4 +1,4 @@
-// Match prep page: an opponent's username -> their finished games -> their opening tree -> weak spots, an explorer
+// Scout page: an opponent's username -> their finished games -> their opening tree -> weak spots, an explorer
 // of what they play, their habits checked with Stockfish, and game plans: full lines that punish the costly ones. Fair play: finished games only, as in the drill.
 
 import { Chess } from "chess.js";
@@ -7,14 +7,14 @@ import { ChessCom } from "./chesscom.js";
 import { EnginePool, Evaluator } from "./evals.js";
 import { numbered, refutation } from "./explain.js";
 import { Lichess } from "./lichess.js";
-import { buildTree, byFamily, bookExit, family, habits, kidsOf, lineOf, numberLine, predictability, rankPlans, theirMoves, verdictOf, walk, weakSpots } from "./prep.js";
+import { buildTree, byFamily, bookExit, family, habits, kidsOf, lineOf, numberLine, predictability, rankPlans, theirMoves, verdictOf, walk, weakSpots } from "./scout.js";
 import { Select } from "./select.js";
 import { IdbStore, MemoryStore } from "./store.js";
 import { UciEngine } from "./uci.js";
 import { fitHero, poolSize, setupTheme, workerTransport } from "./ui.js";
 
 const cfg = await (await fetch(new URL("./config.json", import.meta.url))).json();
-const P = cfg.prep;
+const P = cfg.scout;
 const ENGINE_URL = "engine/stockfish-19-lite-single.js";
 const SITE_NAME = { chesscom: "Chess.com", lichess: "Lichess" };
 const COLOR = { w: "White", b: "Black" };
@@ -110,7 +110,7 @@ async function analyze(accounts, rangeValue, timeClasses, mine) {
     return;
   }
   const [{ site, username: first }, also = null] = accounts;
-  await store.set("prep-last", { site, username: first, also, range: rangeValue, timeClasses, side: mine });
+  await store.set("scout-last", { site, username: first, also, range: rangeValue, timeClasses, side: mine });
   const tree = buildTree(theirGames, { plies: P.plies, names });
   Object.assign(state, { tree, mine, theirs, username, site, node: tree.root, judged: new Map(), bests: new Map(), evaluate: null, check: null, plans: null, plan: null });
   setStatus("");
@@ -472,7 +472,7 @@ async function main() {
     $("username2").focus();
   });
   $("btn-also-remove").addEventListener("click", () => { showAlso(false); $("btn-also").focus(); });
-  const last = await store.get("prep-last");
+  const last = (await store.get("scout-last")) ?? (await store.get("prep-last"));   // the page was called Prep before
   if (last) {
     $("site").value = last.site === "lichess" ? "lichess" : "chesscom";
     siteSel.sync();

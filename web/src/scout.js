@@ -1,6 +1,6 @@
-// Match prep: what an opponent plays in the opening and where it goes badly for them, from their finished games.
+// Scout: what an opponent plays in the opening and where it goes badly for them, from their finished games.
 // Pure functions over games in the shape chesscom.js / lichess.js return (seen from the opponent: `color` is the
-// colour they had, `result` is their result). No engine here; prep-app.js adds the engine check of their habits.
+// colour they had, `result` is their result). No engine here; scout-app.js adds the engine check of their habits.
 
 import { Chess } from "chess.js";
 

@@ -1,14 +1,14 @@
-/* Match prep (prep/index.html): the report beside the board. Builds on app.css. */
+/* Scout (scout/index.html): the report beside the board. Builds on app.css. */
 
 /* Views: intro (hero + form), loading (status), report (board + report) */
-.prep-page[data-view="report"] .boardbox { display: block; }
-.prep-page[data-view="report"] .hero { display: none; }
-.prep-page[data-view="report"] .stage { aspect-ratio: 1; }
-.prep-page[data-view="report"] .counters { display: grid; }
-.prep-page[data-view="report"] .form:not(.open) .form-body { display: none; }
-.prep-page[data-view="report"] .form:not(.open) .form-summary { display: flex; }
-.prep-page:not([data-view="intro"]) .how { display: none; }
-.prep-page[data-view="report"] .board .sq { cursor: default; }
+.scout-page[data-view="report"] .boardbox { display: block; }
+.scout-page[data-view="report"] .hero { display: none; }
+.scout-page[data-view="report"] .stage { aspect-ratio: 1; }
+.scout-page[data-view="report"] .counters { display: grid; }
+.scout-page[data-view="report"] .form:not(.open) .form-body { display: none; }
+.scout-page[data-view="report"] .form:not(.open) .form-summary { display: flex; }
+.scout-page:not([data-view="intro"]) .how { display: none; }
+.scout-page[data-view="report"] .board .sq { cursor: default; }
 
 /* You'll have White / Black: two joined buttons, one pressed (joined reads as pick-one) */
 .seg { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: 0; margin: 0; padding: 0; border: 0; }
@@ -23,15 +23,15 @@
 .seg input:focus-visible + span { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 /* The report: summary band, tabs, one pane at a time (scrolls inside the panel on desktop) */
-.prep-page .panel > .report { display: flex; flex-direction: column; gap: 14px; min-height: 0; flex: 1 1 auto; }
-.prep-page .panel > .report[hidden] { display: none; }
+.scout-page .panel > .report { display: flex; flex-direction: column; gap: 14px; min-height: 0; flex: 1 1 auto; }
+.scout-page .panel > .report[hidden] { display: none; }
 .report > :not(.pane) { flex: none; }
 .report > .pane { flex: 1 1 auto; }
-.prep-page .how > li > .label { white-space: normal; }
-.prep-counters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.prep-counters .counter b { font-size: 1.75rem; white-space: nowrap; }
-.prep-counters .counter .label { line-height: 1.25; }
-.prep-counters .counter + .counter { padding-left: 14px; }
+.scout-page .how > li > .label { white-space: normal; }
+.scout-counters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.scout-counters .counter b { font-size: 1.75rem; white-space: nowrap; }
+.scout-counters .counter .label { line-height: 1.25; }
+.scout-counters .counter + .counter { padding-left: 14px; }
 .tabs { display: flex; border-bottom: var(--medium); }
 .tabs [role="tab"] { flex: 1; min-height: var(--touch); border: 0; border-bottom: 4px solid transparent; margin-bottom: -2px; background: none; cursor: pointer;
   font: 500 0.8125rem var(--f-mono); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-muted); }
@@ -80,8 +80,8 @@ svg.arrows g.yours line { stroke: var(--accent); }
 svg.arrows g.yours polygon { fill: var(--accent); }
 
 @media (max-width: 640px) {
-  .prep-counters { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 12px; }
-  .prep-counters .counter:nth-child(3) { border-left: 0; padding-left: 0; }
+  .scout-counters { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 12px; }
+  .scout-counters .counter:nth-child(3) { border-left: 0; padding-left: 0; }
 }
 
 /* Game plan: the road (your moves in accent, theirs with how often they play them), then the punishment */

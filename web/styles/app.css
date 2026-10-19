@@ -490,7 +490,7 @@ svg.arrows polygon { fill: var(--ink); }
   background: var(--ok-bg); color: var(--ok-fg); animation: peek-tick 3.2s steps(1) infinite; }
 @keyframes peek-tick { 0% { opacity: 0; } 58% { opacity: 1; } }
 
-/* ---------- Tools nav in the bar: the drill and match prep ---------- */
+/* ---------- Tools nav in the bar: the drill and scout ---------- */
 .bar-left { display: flex; align-items: center; gap: 22px; min-width: 0; }
 .tools { display: flex; gap: 14px; }
 .tools a { border: 0; padding: 4px 0; font: 500 0.75rem var(--f-mono); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--ink-muted);

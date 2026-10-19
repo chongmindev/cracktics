@@ -66,8 +66,8 @@ safe_max_opp_eval = 150  # opponent's eval after their best reply stays below th
 safe_sample_rate = 0.3    # fraction of qualifying safe moves sent to the MultiPV check
 safe_ratio = 0.6          # keep at most this many safe items per threat item
 
-[prep]
-# Match prep: an opponent's opening tree from their finished games
+[scout]
+# Scout: an opponent's opening tree from their finished games
 plies = 24                # moves of each game kept in the tree (12 each)
 min_games = 3             # a line needs this many of their games to count as a weak spot
 weak_gap = 0.12           # ...and their score there this far below their overall score

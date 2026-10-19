@@ -22,7 +22,7 @@ def exported() -> str:
             "drills": asdict(cfg.drills),
             "scan": asdict(cfg.scan),
             "trainer": asdict(cfg.trainer),
-            "prep": asdict(cfg.prep),
+            "scout": asdict(cfg.scout),
             "fetch": {"base_url": cfg.fetch.base_url, "min_interval": cfg.fetch.min_interval,
                       "months": cfg.fetch.months, "time_classes": list(cfg.fetch.time_classes)}}
     return json.dumps(data, indent=2) + "\n"

@@ -28,7 +28,7 @@
   "trainer": {
     "fix_tolerance": 100
   },
-  "prep": {
+  "scout": {
     "plies": 24,
     "min_games": 3,
     "weak_gap": 0.12,

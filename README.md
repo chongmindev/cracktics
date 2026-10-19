@@ -16,9 +16,9 @@ and schedules positions with spaced repetition (Leitner boxes).
 > **https://chongmindev.github.io/cracktics/** (source in [`web/`](web/)). The Python pipeline, MCP server
 > and single-file trainer below read Chess.com only.
 
-## Match prep
+## Scout
 
-A second page, **https://chongmindev.github.io/cracktics/prep/**, prepares you for a game against one person.
+A second page, **https://chongmindev.github.io/cracktics/scout/**, prepares you for a game against one person.
 Give it their username (and, if they have one, their account on the other site, pooled into one report) and
 the colour you'll have; it reads their finished games and shows:
 
@@ -33,7 +33,7 @@ the colour you'll have; it reads their finished games and shows:
 - **Habits:** positions they reach often and answer the same way, each checked with Stockfish; a habit that
   gives something away is marked.
 
-The thresholds live in `[prep]` in `config.toml`; the analysis is `web/src/prep.js`.
+The thresholds live in `[scout]` in `config.toml`; the analysis is `web/src/scout.js`.
 
 ## Requirements
 
@@ -94,7 +94,7 @@ settings (request pacing, time classes).
 Only **finished** games are ever analysed. The fetcher reads Chess.com's monthly archives, which contain
 finished games only, and never calls the current-games endpoints. On Lichess the web app uses the games
 export with `ongoing=false`, which returns finished games only. Both sites ban engine assistance during
-games; this tool is for reviewing them afterwards. Match prep studies an opponent's finished public games
+games; this tool is for reviewing them afterwards. Scout studies an opponent's finished public games
 before you play them, which both sites allow; it is not for use during a game.
 
 ## Privacy

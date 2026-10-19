@@ -82,8 +82,8 @@ class DrillConfig:
 
 
 @dataclass(frozen=True)
-class PrepConfig:
-    """Match prep (web only): an opponent's opening tree, weak spots and habits."""
+class ScoutConfig:
+    """Scout (web only): an opponent's opening tree, weak spots and habits."""
     plies: int
     min_games: int
     weak_gap: float
@@ -111,7 +111,7 @@ class Config:
     report: ReportConfig
     summary: SummaryConfig
     drills: DrillConfig
-    prep: PrepConfig
+    scout: ScoutConfig
 
 
 def _build(cls, table: dict, section: str):
@@ -138,5 +138,5 @@ def load(path: str | Path | None = None) -> Config:
         report=_build(ReportConfig, raw["report"], "report"),
         summary=_build(SummaryConfig, raw["summary"], "summary"),
         drills=_build(DrillConfig, raw["drills"], "drills"),
-        prep=_build(PrepConfig, raw["prep"], "prep"),
+        scout=_build(ScoutConfig, raw["scout"], "scout"),
     )
