@@ -85,6 +85,7 @@ class DrillConfig:
 class ScoutConfig:
     """Scout (web only): an opponent's opening tree, weak spots and habits."""
     plies: int
+    half_life_days: int
     min_games: int
     weak_gap: float
     weak_spots: int

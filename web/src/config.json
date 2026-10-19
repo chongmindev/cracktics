@@ -30,6 +30,7 @@
   },
   "scout": {
     "plies": 24,
+    "half_life_days": 60,
     "min_games": 3,
     "weak_gap": 0.12,
     "weak_spots": 6,

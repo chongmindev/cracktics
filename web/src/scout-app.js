@@ -7,7 +7,7 @@ import { ChessCom } from "./chesscom.js";
 import { EnginePool, Evaluator } from "./evals.js";
 import { numbered, refutation } from "./explain.js";
 import { Lichess } from "./lichess.js";
-import { buildTree, byFamily, bookExit, family, habits, kidsOf, lineOf, numberLine, predictability, rankPlans, theirMoves, verdictOf, walk, weakSpots } from "./scout.js";
+import { buildTree, byFamily, bookExit, family, habits, kidsOf, lineOf, numberLine, predictability, rankPlans, share, theirMoves, verdictOf, walk, weakSpots, winRate } from "./scout.js";
 import { Select } from "./select.js";
 import { IdbStore, MemoryStore } from "./store.js";
 import { UciEngine } from "./uci.js";
@@ -20,10 +20,12 @@ const SITE_NAME = { chesscom: "Chess.com", lichess: "Lichess" };
 const COLOR = { w: "White", b: "Black" };
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const pct = (x) => `${Math.round(100 * x)}%`;
+const pct = (x) => (x > 0 && x < 0.005 ? "<1%" : `${Math.round(100 * x)}%`);   // an old game weighs little, but it was played
 const games = (n) => `${n} game${n === 1 ? "" : "s"}`;
-/** Their win rate in a node (draws aside; the W/D/L bar shows those). Every percentage on the page says what it counts. */
-const won = (nd) => (nd.n ? nd.w / nd.n : 0);
+/** Their win rate in a node (draws aside; the W/D/L bar shows those), recent games counting more. Every percentage on
+ *  the page says what it counts. */
+const won = winRate;
+const RECENT = `Recent games count more: a game ${P.half_life_days} days older than their latest counts half.`;
 
 let names = null, store = null, pool = null, board = null;
 let state = null;   // {tree, mine, theirs, username, site, node, judged: Map(move node -> {loss, bestSan}), plans, plan, run}
@@ -43,7 +45,7 @@ const sideNow = () => document.querySelector("input[name=side]:checked")?.value 
 
 /** W/D/L bar from their side: their wins, draws, losses. */
 function wdl(nd) {
-  const w = (100 * nd.w) / nd.n, d = (100 * nd.d) / nd.n;
+  const t = nd.wt ?? nd, w = (100 * t.w) / t.n, d = (100 * t.d) / t.n;   // widths weighted like the percentages
   return `<span class="wdl" title="Their results: ${nd.w} won, ${nd.d} drawn, ${nd.l} lost"><i class="w" style="width:${w}%"></i><i class="d" style="width:${d}%"></i><i class="l"></i></span>`;
 }
 
@@ -111,7 +113,7 @@ async function analyze(accounts, rangeValue, timeClasses, mine) {
   }
   const [{ site, username: first }, also = null] = accounts;
   await store.set("scout-last", { site, username: first, also, range: rangeValue, timeClasses, side: mine });
-  const tree = buildTree(theirGames, { plies: P.plies, names });
+  const tree = buildTree(theirGames, { plies: P.plies, names, halfLife: P.half_life_days });
   Object.assign(state, { tree, mine, theirs, username, site, node: tree.root, judged: new Map(), bests: new Map(), evaluate: null, check: null, plans: null, plan: null });
   setStatus("");
   board.white = mine === "w";
@@ -147,12 +149,12 @@ function paintWeak() {
       <span class="row-main"><b class="mono">${esc(lineText(s.node))}</b><span class="row-name">${esc(s.node.name || "Unnamed line")}</span></span>
       <span class="row-side"><b>${pct(won(s.node))}</b><span class="label">they won · ${games(s.node.n)}</span></span>${wdl(s.node)}</button></li>`).join("");
   $("pane-weak").innerHTML =
-    `<p class="pane-intro">Lines you can steer into as ${COLOR[mine]} where ${esc(username)} does much worse than usual. Overall they win ${pct(won(tree.root))} of these games; the % on each line is how many they won there.</p>` +
+    `<p class="pane-intro">Lines you can steer into as ${COLOR[mine]} where ${esc(username)} does much worse than usual. Overall they win ${pct(won(tree.root))} of these games; the % on each line is how many they won there. ${RECENT}</p>` +
     (spots.length ? `<ol class="rows">${rows}</ol>`
       : `<p class="empty">No line with ${P.min_games}+ games where they do clearly worse. More games (a longer range or more time controls) may show some.</p>`) +
     (fams.length ? `<h3 class="label pane-head">By opening</h3><ol class="rows fams">` + fams.map((f, i) => `<li><button type="button" class="row" data-fam="${i}">
       <span class="row-main"><span class="row-name">${esc(f.family)}</span><span class="label">${esc(f.eco)}</span></span>
-      <span class="row-side"><b>${pct(f.n ? f.w / f.n : 0)}</b><span class="label">they won · ${games(f.n)}</span></span>${wdl(f)}</button></li>`).join("") + `</ol>` : "");
+      <span class="row-side"><b>${pct(won(f))}</b><span class="label">they won · ${games(f.n)}</span></span>${wdl(f)}</button></li>`).join("") + `</ol>` : "");
   $("pane-weak").onclick = (e) => {
     const b = e.target.closest("button.row");
     if (!b) return;
@@ -184,20 +186,19 @@ function goTo(nd, { judge: wantJudge = true } = {}) {
   const crumbs = path.map((x, i) => i === 0
     ? `<button type="button" class="crumb" data-ply="0">Start</button>`
     : `<button type="button" class="crumb" data-ply="${i}">${i % 2 === 1 ? `${(i + 1) / 2}.` : ""}${esc(x.san)}</button>`).join("");
-  const total = kids.reduce((s, k) => s + k.n, 0);
   // Their costliest move here, if Stockfish has found one, and what was better.
   const slip = theirTurn ? kids.filter((k) => (state.judged.get(k)?.loss ?? 0) >= P.slip_loss).sort((a, b) => b.n - a.n)[0] : null;
   const sj = slip && state.judged.get(slip), planI = slip ? state.plans?.findIndex((p) => p.move === slip && p.w) ?? -1 : -1;
   const rows = kids.map((k) => `<li><button type="button" class="row" data-san="${esc(k.san)}">
       <span class="row-main"><span class="row-move"><b class="mono">${esc(k.san)}</b>${tagOf(k)}</span><span class="row-name">${k.name && k.name !== nd.name ? `${esc(k.name)} · ` : ""}they won ${pct(won(k))}</span></span>
-      <span class="row-side"><b>${pct(k.n / total)}</b><span class="label">played · ${games(k.n)}</span></span>${wdl(k)}</button></li>`).join("");
+      <span class="row-side"><b>${pct(share(k))}</b><span class="label">played · ${games(k.n)}</span></span>${wdl(k)}</button></li>`).join("");
   const links = nd.links.slice(0, 3).map((l, i) => `<a href="${esc(l)}" target="_blank" rel="noopener">Game ${i + 1} ↗</a>`).join("");
   $("pane-tree").innerHTML =
     `<nav class="crumbs" aria-label="Line">${crumbs}</nav>` +
     `<p class="opening"><span class="label">${esc(nd.eco || "")}</span> ${esc(nd.name || "Starting position")}</p>` +
     `<p class="pane-intro">${nd.n === 1 ? "One of their games" : `${nd.n} of their games`} reached this. ` +
       (kids.length ? (theirTurn ? `<b>${esc(username)}</b> to move: what they played here.` : `Your move: what their opponents played, and how ${esc(username)} did.`) +
-        ` Each move: how often it was played, how often ${esc(username)} won after it, and Stockfish's verdict.`
+        ` Each move: how often it was played, how often ${esc(username)} won after it, and Stockfish's verdict. ${RECENT}`
         : "Their games go different ways from here.") + `</p>` +
     (slip ? `<p class="slip-note"><b>Use this:</b> ${esc(username)} played <b>${esc(slip.san)}</b> here in ${slip.n} of ${nd.n} games, and it gives away ` +
       `about ${(sj.loss / 100).toFixed(1)} pawns; <b>${esc(sj.bestSan)}</b> was best.` +
@@ -213,7 +214,7 @@ function goTo(nd, { judge: wantJudge = true } = {}) {
     if (r) goTo(nd.kids.get(r.dataset.san));
   };
   // Board: the position, the move that led here, and arrows for the moves played next (heavier = more often).
-  const arrows = kids.slice(0, 4).map((k) => ({ from: k.uci.slice(0, 2), to: k.uci.slice(2, 4), weight: k.n / total, kind: theirTurn ? "theirs" : "yours" }));
+  const arrows = kids.slice(0, 4).map((k) => ({ from: k.uci.slice(0, 2), to: k.uci.slice(2, 4), weight: share(k), kind: theirTurn ? "theirs" : "yours" }));
   const last = nd.uci ? { from: nd.uci.slice(0, 2), to: nd.uci.slice(2, 4) } : null;
   board.draw(nd.fen, { last, arrows });
   if (wantJudge) judgeHere(nd);
@@ -396,7 +397,7 @@ function openPlan(i) {
     `<button type="button" class="link-btn plan-back">← All plans</button>` +
     `<p class="opening"><span class="label">${esc(p.node.eco || "")}</span> Punish ${esc(moveText(p.move))}</p>` +
     `<p class="pane-intro">${roadSteps.length ? `${yourMoves ? `Play the highlighted ${yourMoves === 1 ? "move" : "moves"}` : "Wait for it"}; ` +
-      `${esc(username)} has gone this way about ${pct(p.odds / (p.move.n / p.node.n))} of the time. ` : ""}` +
+      `${esc(username)} has gone this way about ${pct(p.odds / share(p.move))} of the time. ` : ""}` +
       `Once there, they played <b>${esc(p.move.san)}</b> in ${p.move.n} of ${p.node.n} games, and it costs them about ${(p.loss / 100).toFixed(1)} pawns.</p>` +
     (roadSteps.length ? `<div class="road"><span class="label">The road</span><nav class="crumbs">${chips}</nav>${offHtml}</div>` : "") +
     `<div class="walk plan-walk"><p class="label">The punishment</p><ol class="walk-steps">${rows}</ol>` +

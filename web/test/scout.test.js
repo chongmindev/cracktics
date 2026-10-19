@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Chess } from "chess.js";
-import { buildTree, byFamily, habits, keyOf, kidsOf, lineOf, mainLine, numberLine, predictability, rankPlans, road, score, theirMoves, verdictOf, weakSpots } from "../src/scout.js";
+import { buildTree, byFamily, habits, keyOf, kidsOf, lineOf, mainLine, numberLine, predictability, rankPlans, road, score, share, theirMoves, verdictOf, weakSpots, weightOf, winRate } from "../src/scout.js";
 
 /** A game seen from the opponent ("their" colour), from SAN moves. */
 function game(sans, color, result) {
@@ -68,4 +68,19 @@ test("verdictOf: thresholds, and the engine's own move is best", () => {
   const t = { dubious: 50, mistake: 100, blunder: 250 };
   assert.deepEqual([0, 49, 50, 100, 250].map((l) => verdictOf(l, t)), ["good", "good", "dubious", "mistake", "blunder"]);
   assert.equal(verdictOf(0, { ...t, best: true }), "best");
+});
+
+test("recent games count more: shares and win rates are weighted, game counts stay real", () => {
+  const day = 86400, now = 1_800_000_000;
+  const g = (moves, result, daysAgo) => ({ color: "b", result, moves, endTime: now - daysAgo * day });
+  // Old habit: 1…e5 (three games, 120 days back). New habit: 1…c5 (one game, this week).
+  const games = [g(["e4", "c5"], "win", 0), g(["e4", "e5"], "loss", 120), g(["e4", "e5"], "loss", 120), g(["e4", "e5"], "loss", 120)];
+  const flat = buildTree(games), recent = buildTree(games, { halfLife: 60 });
+  const e4 = (t) => t.root.kids.get("e4");
+  assert.equal(share(e4(flat).kids.get("c5")), 0.25);
+  assert.equal(share(e4(recent).kids.get("c5")), 1 / (1 + 3 * 0.25));   // 120 days = two half-lives
+  assert.deepEqual(kidsOf(e4(recent)).map((k) => k.san), ["c5", "e5"]);
+  assert.equal(e4(recent).n, 4);                                         // still 4 real games
+  assert.equal(winRate(e4(recent)), 1 / 1.75);
+  assert.equal(weightOf({ endTime: now }, now, 0), 1);
 });

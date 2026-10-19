@@ -33,7 +33,8 @@ the colour you'll have; it reads their finished games and shows:
 - **Habits:** positions they reach often and answer the same way, each checked with Stockfish; a habit that
   gives something away is marked.
 
-The thresholds live in `[scout]` in `config.toml`; the analysis is `web/src/scout.js`.
+Recent games count more: a game loses half its weight every 60 days before their newest game
+(`half_life_days`), in every percentage; game counts stay real counts. The thresholds live in `[scout]` in `config.toml`; the analysis is `web/src/scout.js`.
 
 ## Requirements
 

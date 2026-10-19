@@ -69,6 +69,7 @@ safe_ratio = 0.6          # keep at most this many safe items per threat item
 [scout]
 # Scout: an opponent's opening tree from their finished games
 plies = 24                # moves of each game kept in the tree (12 each)
+half_life_days = 60       # recent games count more: a game this many days older than their newest counts half (0: all equal)
 min_games = 3             # a line needs this many of their games to count as a weak spot
 weak_gap = 0.12           # ...and their score there this far below their overall score
 weak_spots = 6            # weak spots listed

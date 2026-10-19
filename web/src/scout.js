@@ -7,8 +7,25 @@ import { Chess } from "chess.js";
 /** A position without the move counters, so the same position reached by different move orders matches. */
 export const keyOf = (fen) => fen.split(" ").slice(0, 4).join(" ");
 
-/** Their score in a node: wins plus half the draws, over games. */
-export const score = (n) => (n.n ? (n.w + n.d / 2) / n.n : 0);
+// Every node keeps two tallies of its games: n/w/d/l, real counts (shown as "N games", and what the minimum-games
+// thresholds test), and wt = {n, w, d, l}, the same weighted by recency (a game counts half every half-life days
+// before their newest game). Percentages (how often a move is played, how often they won) use the weighted tally.
+
+/** The weighted tally of a node, or its plain counts when it has none (a by-opening row, a test node). */
+const tally = (x) => x.wt ?? x;
+
+/** Their score in a node: wins plus half the draws, over games (recent games counting more). */
+export const score = (x) => { const t = tally(x); return t.n ? (t.w + t.d / 2) / t.n : 0; };
+
+/** How often they won from a node (draws aside), recent games counting more. */
+export const winRate = (x) => { const t = tally(x); return t.n ? t.w / t.n : 0; };
+
+/** How often a move was played from its position, recent games counting more. */
+export const share = (kid) => (kid.parent && tally(kid.parent).n ? tally(kid).n / tally(kid.parent).n : 0);
+
+/** A game's weight: 1 for their newest game, halving every halfLife days before it (0: every game counts 1). */
+export const weightOf = (g, newest, halfLife) =>
+  halfLife > 0 && g.endTime && newest ? 0.5 ** (Math.max(0, newest - g.endTime) / 86400 / halfLife) : 1;
 
 /** The name of an opening's family: "Sicilian Defense: Najdorf Variation" -> "Sicilian Defense". */
 export const family = (name) => name?.split(":")[0] ?? null;
@@ -17,44 +34,49 @@ function node(move, fen, ply, parent, names) {
   const key = keyOf(fen);
   return { san: move?.san ?? null, uci: move ? move.from + move.to + (move.promotion || "") : null, fen, key, ply, parent,
     name: names[key]?.[1] ?? parent?.name ?? null, eco: names[key]?.[0] ?? parent?.eco ?? null,
-    n: 0, w: 0, d: 0, l: 0, kids: new Map(), links: [] };
+    n: 0, w: 0, d: 0, l: 0, wt: { n: 0, w: 0, d: 0, l: 0 }, kids: new Map(), links: [] };
 }
 
-function count(nd, g) {
+function count(nd, g, wt) {
+  const r = g.result === "win" ? "w" : g.result === "draw" ? "d" : "l";
   nd.n++;
-  if (g.result === "win") nd.w++; else if (g.result === "draw") nd.d++; else nd.l++;
+  nd[r]++;
+  nd.wt.n += wt;
+  nd.wt[r] += wt;
   if (g.link && nd.links.length < 5) nd.links.push(g.link);   // games come newest first, so these are the latest
 }
 
 /**
  * The opening tree of their games, first `plies` plies. names: position key -> [eco, name] (src/openings.json).
+ * halfLife: days over which a game's weight halves, counted back from their newest game (0: no weighting).
  * Returns {root, games, book, openings}: book = per game, the last ply still in a named opening; openings = per game,
  * {name, eco, result} of the deepest named position it reached.
  */
-export function buildTree(games, { plies = 24, names = {} } = {}) {
+export function buildTree(games, { plies = 24, names = {}, halfLife = 0 } = {}) {
   const root = node(null, new Chess().fen(), 0, null, names);
   const book = [], openings = [];
+  const newest = Math.max(0, ...games.map((g) => g.endTime || 0));
   for (const g of games) {
-    const chess = new Chess();
+    const chess = new Chess(), wt = weightOf(g, newest, halfLife);
     let cur = root, last = 0, named = null;
-    count(cur, g);
+    count(cur, g, wt);
     for (let i = 0; i < Math.min(plies, g.moves.length); i++) {
       let m;
       try { m = chess.move(g.moves[i]); } catch { break; }
       let kid = cur.kids.get(m.san);
       if (!kid) cur.kids.set(m.san, (kid = node(m, chess.fen(), i + 1, cur, names)));
       cur = kid;
-      count(cur, g);
+      count(cur, g, wt);
       if (names[cur.key]) { last = i + 1; named = names[cur.key]; }
     }
     book.push(last);
-    if (named) openings.push({ eco: named[0], name: named[1], result: g.result });
+    if (named) openings.push({ eco: named[0], name: named[1], result: g.result, wt });
   }
   return { root, games: games.length, book, openings };
 }
 
-/** Children of a node, most played first. */
-export const kidsOf = (nd) => [...nd.kids.values()].sort((a, b) => b.n - a.n || score(a) - score(b));
+/** Children of a node, most played first (recent games counting more). */
+export const kidsOf = (nd) => [...nd.kids.values()].sort((a, b) => tally(b).n - tally(a).n || b.n - a.n || score(a) - score(b));
 
 /** Every node below `root`, depth first. */
 export function* walk(root) {
@@ -110,9 +132,12 @@ export function weakSpots(tree, theirColor, { minGames = 3, gap = 0.12, max = 6 
 export function byFamily(tree, { minGames = 3 } = {}) {
   const fam = new Map();
   for (const o of tree.openings) {
-    const f = family(o.name), e = fam.get(f) || { family: f, eco: o.eco, n: 0, w: 0, d: 0, l: 0 };
+    const f = family(o.name), e = fam.get(f) || { family: f, eco: o.eco, n: 0, w: 0, d: 0, l: 0, wt: { n: 0, w: 0, d: 0, l: 0 } };
+    const r = o.result === "win" ? "w" : o.result === "draw" ? "d" : "l", wt = o.wt ?? 1;
     e.n++;
-    if (o.result === "win") e.w++; else if (o.result === "draw") e.d++; else e.l++;
+    e[r]++;
+    e.wt.n += wt;
+    e.wt[r] += wt;
     fam.set(f, e);
   }
   return [...fam.values()].filter((e) => e.n >= minGames).map((e) => ({ ...e, score: score(e) })).sort((a, b) => b.n - a.n);
@@ -127,8 +152,7 @@ export function habits(tree, theirColor, { minGames = 3, minShare = 0.5 } = {}) 
   for (const nd of [tree.root, ...walk(tree.root)]) {
     if (nd.n < minGames || nd.fen.split(" ")[1] !== theirColor || !nd.kids.size) continue;
     const [top] = kidsOf(nd);
-    const share = top.n / nd.n;
-    if (share >= minShare) out.push({ node: nd, move: top, share });
+    if (share(top) >= minShare) out.push({ node: nd, move: top, share: share(top) });
   }
   return out.sort((a, b) => b.node.n - a.node.n || a.node.ply - b.node.ply);
 }
@@ -149,9 +173,9 @@ export function predictability(tree, theirColor, plies = 12) {
   let same = 0, all = 0;
   for (const nd of [tree.root, ...walk(tree.root)]) {
     if (nd.ply >= plies || nd.fen.split(" ")[1] !== theirColor || !nd.kids.size) continue;
-    const kids = kidsOf(nd), total = kids.reduce((s, k) => s + k.n, 0);
-    same += kids[0].n;
-    all += total;
+    const kids = kidsOf(nd);
+    same += tally(kids[0]).n;
+    all += kids.reduce((s, k) => s + tally(k).n, 0);
   }
   return all ? same / all : 0;
 }
@@ -172,9 +196,9 @@ export function road(nd, theirColor) {
   const steps = [];
   let odds = 1;
   for (let x = nd; x?.parent; x = x.parent) {
-    const theirs = x.parent.fen.split(" ")[1] === theirColor, share = x.n / x.parent.n;
-    if (theirs) odds *= share;
-    steps.unshift({ node: x, theirs, share });
+    const theirs = x.parent.fen.split(" ")[1] === theirColor, sh = share(x);
+    if (theirs) odds *= sh;
+    steps.unshift({ node: x, theirs, share: sh });
   }
   return { steps, odds };
 }
@@ -193,7 +217,7 @@ export function rankPlans(slips, theirColor, { lossCap = 500 } = {}) {
 export function theirMoves(tree, theirColor, { minGames = 2, max = 60 } = {}) {
   const out = [];
   for (const nd of walk(tree.root)) if (nd.n >= minGames && nd.parent.fen.split(" ")[1] === theirColor) out.push(nd);
-  return out.sort((a, b) => b.n - a.n || a.ply - b.ply).slice(0, max);
+  return out.sort((a, b) => tally(b).n - tally(a).n || a.ply - b.ply).slice(0, max);
 }
 
 /** A move's verdict from what it gives away (centipawns against the best move): best, good, dubious, mistake, blunder. */
