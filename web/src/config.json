@@ -7,26 +7,16 @@
   "drills": {
     "depth": 13,
     "multipv": 5,
-    "seed": 3,
-    "threat_min_loss": 250,
-    "threat_min_before": -300,
-    "threat_min_move": 3,
-    "accept_within": 80,
-    "accept_min_gain": 200,
-    "safe_max_loss": 25,
-    "safe_min_move": 8,
-    "safe_after_min": -150,
-    "safe_after_max": 400,
-    "safe_max_opp_eval": 150,
-    "safe_sample_rate": 0.3,
-    "safe_ratio": 0.6
+    "mistake_min_loss": 100,
+    "mistake_min_before": -300,
+    "mistake_max_after": 500,
+    "mistake_min_move": 3,
+    "accept_within": 50,
+    "accept_min_gain": 75
   },
   "scan": {
     "screen_depth": 10,
-    "screen_margin": 100
-  },
-  "trainer": {
-    "fix_tolerance": 100
+    "screen_margin": 50
   },
   "scout": {
     "plies": 24,
@@ -46,6 +36,22 @@
     "plan_max": 8,
     "plan_depth": 18,
     "plan_loss_cap": 500
+  },
+  "openings": {
+    "book_month": "2026-09",
+    "book_games": 2000000,
+    "book_min_elo": 1200,
+    "book_max_elo": 2300,
+    "book_min_base": 180,
+    "book_plies": 24,
+    "book_min_games": 40,
+    "book_depth": 14,
+    "answer_tolerance": 40,
+    "side_min_share": 0.04,
+    "side_max": 5,
+    "trap_max_loss": 50,
+    "trap_reply_loss": 120,
+    "trap_min_share": 0.002
   },
   "fetch": {
     "base_url": "https://api.chess.com/pub",

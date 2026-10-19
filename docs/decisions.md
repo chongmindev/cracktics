@@ -99,3 +99,25 @@ and JS alike. Adding a game never changes which earlier safe items were chosen u
 Python's `round()` is half-to-even on inexact floats, which JS can't reproduce simply. `pawns(cp)` rounds
 centipawns to tenths, halves away from zero, using integers; the safe cap is `floor(n * ratio + 0.5)`.
 Identical in both languages.
+
+## 2026-10-19 · The drill is the position before my mistake; find the better move
+
+The drill used to show the board right after one of my moves and ask for the opponent's punishing reply (or
+"nothing works" for a safe move), then ask for the fix. Chong asked for something simpler and more useful: go back
+to before the mistake and find the best move. Now an item is a move that cost at least `mistake_min_loss` (1 pawn)
+while I wasn't already lost (`mistake_min_before`) or still winning easily (`mistake_max_after`). Accepted answers
+are the MultiPV moves within `accept_within` of the best that beat my move by `accept_min_gain`; any other move is
+judged by the engine against the same two tests. Python (`cracktics/drills.py`) and JS (`web/src/rules.js`) changed
+together, so the parity test still holds. The quick pass's `screen_margin` dropped from 100 to 50: at 100 the screen
+(loss ≥ 0) would let every move through. Rejected: keeping safe positions as a share of the deck (they belonged to
+the "is there a threat?" question, which this drill no longer asks).
+
+## 2026-10-19 · The Openings book is built from the Lichess open database, not the opening explorer
+
+The Lichess opening explorer (explorer.lichess.ovh) now answers 401 without a login, and an OAuth login would
+leave out everyone without a Lichess account. Instead `tools/build_book.py` streams the start of one month of the
+open database (CC0; curl stops after the games it needs, about 2 GB of a 30 GB file), keeps rated blitz-or-slower
+games between 1200 and 2300, counts every move sequence to ply 24, keeps positions with 40+ games, and evaluates
+each with Stockfish at depth 16. The book ships with the site, so the quest needs no network and no waiting. Moves
+are counted by sequence, not by position, so transpositions are separate lines.
+

@@ -126,8 +126,8 @@ interface washes, `--sq-light` / `--sq-dark` for the board, `--board-mark` for m
 | Component | Class | Notes |
 |---|---|---|
 | Bar | `.bar` | 56px, wordmark left (the favicon's knight in page ink + name, a link home; hover tips the hat), links, sound and theme right (no status chip: the scan's progress shows in the panel), 4px rule below |
-| Why it works | `.walk.why` | after their punishment is found or revealed: what my move gave up (a guard, a blocked line, a loose piece), then the engine's follow-up, stepped like the idea; dims and stops stepping once the fix starts |
-| The idea | `.walk` | after the fix: every caption shows at once; the engine's move plays, then you step with Next move or by clicking a row (no autoplay) |
+| What it allowed | `.walk.why` | after the puzzle, one click ("What Nf6 allowed: Qxf7#"): my game move, their punishing reply and the engine's line, stepped like the idea, with what my move gave up |
+| The idea | `.walk` | after the puzzle: every caption shows at once; the engine's move plays, then you step with Next move or by clicking a row (no autoplay) |
 | Footer | `.foot` | full width under both columns, lined up with them, words from the left |
 | Step previews | `.how .peek` | hover or focus on Fetch / Scan / Drill shows a small looping picture of that step |
 | Layout | `.main` | desktop: left and right columns share one top and one bottom, in the intro and in the drill |
@@ -139,15 +139,12 @@ interface washes, `--sq-light` / `--sq-dark` for the board, `--board-mark` for m
 | Button | `.btn`, `.btn.primary`, `.btn.ghost` | 2px border, mono caps; hover inverts instantly |
 | Progress | `.meter` | 4px track filling with `--accent` |
 | Counters | `.counters` | inverted band; every column is a 2rem value row over a label row, so numbers and review bars share one line; box counts in tooltips |
-| Played move | `.played-move` | 36px mono on `--accent-wash` with a 4px accent underline: the focal point of the drill |
-| Question | `.question` | Playfair italic, one line ("Can White punish it?") |
-| Scan chip | `.chip[data-kind]` | Checks / Captures / Loose; shows `?` until pressed, then the count, accent fill, and lights the board |
-| Answer row | `.answer` | an accent square + "Move their piece on the board", *or*, "Nothing works"; after a wrong try a note says so and **Reveal** appears |
-| Fix row | `#fix-row` | after the punishment: the board rewinds to before my move (small ◀◀ Rewind tag, slight fade, about half a second); "Move your piece on the board", **Show me** after a wrong fix |
+| Question | `.question` | Playfair italic, one line ("Find the best move for White."), with a line of context under it ("You went wrong here in this game.") |
+| Answer row | `.answer` | an accent square + "Move your piece on the board"; **Hint** (marks the piece to move, counts as a miss); after a wrong try a note says why (what it costs, or "that's what you played") and **Show me** appears |
 | Note | `.note` | try-again message: accent wash with a 4px accent edge |
-| Feedback | `.fb.ok`, `.fb.no` | verdict and game link; move cards; eval bar or "Mate in N". Inverted only if the first try was right; framed otherwise. After the fix step one block replaces it (punishment, your move, your fix, engine's move) |
+| Feedback | `.fb.ok`, `.fb.no` | verdict and game link; move cards (your move, the best move, what you played in the game, struck); eval bar or "Mate in N"; other accepted moves. Inverted only if the first try was right |
 | Game link | `.game-link` | the underline never grows; the ↗ arrow nudges up-right on hover |
-| Move card | `.card`, `.card.key`, `.card.struck`, `.card.miss` | their best reply in accent; what you played struck through; your wrong try struck and grayed |
+| Move card | `.card`, `.card.key`, `.card.struck` | the answer in accent; the game move struck through |
 | Eval bar | `.evalbar` | −6 to +6 pawns, zero tick, hollow square before your move, filled after, accent span between |
 | How it works | `.how` | three columns: accent number, one word, one mono line that never wraps |
 
@@ -188,6 +185,7 @@ Same frame, tokens and components as the drill; extra styles in `styles/scout.cs
 
 | Part | Class | Notes |
 |---|---|---|
+| Openings quest | `.openings-page`, `.quest` | openings/index.html, on Scout's layout: an opening select (every opening, then those White and Black choose, most played first) and a side; then counters (lines done, traps beaten, first try, streak), the opening's name, the moves so far as chips (yours in accent, a miss struck), the prompt, what they just played ("the 3rd most played (6%)"; a trap is only named after you answer), notes, **Show me**, **Next line** |
 | Game plan | `.road`, `.plan-walk` | first tab. A list of plans (costly habit, its road, "Costs N", odds), then one plan: the road as chips (your moves in accent, theirs with how often), where they can go another way, then "Why it's punishable, move by move" as `.walk-steps` rows: why their move fails, then Stockfish's line (up to 12 plies, until neither side threatens anything) with a reason per move: what it takes, the threat it answers or makes, and material as it stands. The board shows the next move as an arrow; ← → (Home / End) and the ← / Next move buttons step through road, habit and line |
 | Tools nav | `.tools` | in the bar beside the wordmark: Drill, Scout; the current page underlined in ink. Under 420px the wordmark shows only the knight |
 | You'll have | `.seg` | White / Black as two joined buttons (pick one) |

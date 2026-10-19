@@ -1,0 +1,16 @@
+/* Openings (openings/index.html): the quest beside the board. Builds on app.css and scout.css. */
+
+.openings-page[data-view="report"] .board .sq { cursor: pointer; }
+.opening-row { grid-template-columns: minmax(0, 1fr); }
+
+.quest { gap: 12px; }
+.quest .question { margin: 0; font-size: 1.5rem; }
+.q-them { margin: -4px 0 0; color: var(--ink-muted); text-transform: none; letter-spacing: 0; font: italic 400 1rem var(--f-body); }
+.q-them:empty { display: none; }
+.q-line { display: flex; flex-wrap: wrap; gap: 4px 8px; min-height: 1.5em; }
+.q-line .crumb { font: 600 0.875rem var(--f-mono); }
+.q-line .crumb.yours { color: var(--accent); }
+.q-line .crumb.missed { text-decoration: line-through; text-decoration-thickness: 2px; }
+.q-actions { display: flex; gap: 12px; align-items: center; }
+.q-actions:not(:has(:not([hidden]))) { display: none; }
+#q-done .fb p { margin: 6px 0 0; }

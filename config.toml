@@ -23,12 +23,7 @@ time_classes = ["rapid"]  # bullet, blitz, rapid, daily; empty list = all
 # Browser only. A quick pass screens every position at screen_depth and runs the drill rules at full depth
 # only on moves within screen_margin of a threshold; a deep pass afterwards completes the exact deck.
 screen_depth = 10
-screen_margin = 100
-
-[trainer]
-# Browser only. In the "fix it" step a move counts as fixing the blunder if the engine's eval after it
-# is at most fix_tolerance below the eval before the blunder (the best you could have done).
-fix_tolerance = 100
+screen_margin = 50        # mistakes start at 1 pawn: the screen looks at moves losing half a pawn or more
 
 [report]
 depth = 14
@@ -48,23 +43,13 @@ opening_plies = 2         # results by opening group games by this many first ha
 [drills]
 depth = 13
 multipv = 5
-seed = 3                  # salt for the per-position hash that samples safe items
-
-# threat item: my move lost a lot, I wasn't already lost, opponent's best reply is a check or capture
-threat_min_loss = 250
-threat_min_before = -300
-threat_min_move = 3
-accept_within = 80        # accepted replies are within this of the opponent's best...
-accept_min_gain = 200     # ...and still gain this much versus the eval before my move
-
-# safe item: my move cost almost nothing, the position is playable, and the opponent's best reply leaves them at most slightly better
-safe_max_loss = 25
-safe_min_move = 8
-safe_after_min = -150
-safe_after_max = 400
-safe_max_opp_eval = 150  # opponent's eval after their best reply stays below this
-safe_sample_rate = 0.3    # fraction of qualifying safe moves sent to the MultiPV check
-safe_ratio = 0.6          # keep at most this many safe items per threat item
+# a puzzle: the position before one of my mistakes, where I find a move as good as the engine's
+mistake_min_loss = 100    # my move lost at least this much against the engine's best...
+mistake_min_before = -300 # ...I wasn't already lost...
+mistake_max_after = 500   # ...and wasn't still winning easily after it
+mistake_min_move = 3
+accept_within = 50        # an answer counts when it is within this of the engine's best...
+accept_min_gain = 75      # ...and beats the move I played by at least this much
 
 [scout]
 # Scout: an opponent's opening tree from their finished games
@@ -85,3 +70,22 @@ move_check_max = 60       # at most this many of their moves judged, most played
 plan_max = 8              # game plans shown: their costliest habits, as full lines
 plan_depth = 18           # engine depth for the punishing line of each plan
 plan_loss_cap = 500       # in ranking plans, a habit costing more than this counts as this (a lost game is a lost game)
+
+[openings]
+# Openings (web only): a quest through every line of an opening, against the moves people really play.
+# The book is built once by tools/build_book.py from the Lichess open database (CC0) and committed.
+book_month = "2026-09"    # database month read
+book_games = 2000000      # rated games counted into the book
+book_min_elo = 1200       # both players rated in this range
+book_max_elo = 2300
+book_min_base = 180       # base time in seconds: blitz and slower (no bullet)
+book_plies = 24           # deepest ply counted (12 moves each)
+book_min_games = 40       # a position stays in the book with at least this many games
+book_depth = 14           # Stockfish depth for every book position
+# the quest
+answer_tolerance = 40     # your move counts when it is within this many centipawns of the best
+side_min_share = 0.04     # an opponent move worth learning to answer: played at least this often...
+side_max = 5              # ...at most this many per position, most played first
+trap_max_loss = 50        # a trap: a move that costs its player at most this...
+trap_reply_loss = 120     # ...where the most played answer to it loses at least this
+trap_min_share = 0.002    # rare moves count as traps down to this share

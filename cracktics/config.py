@@ -39,11 +39,6 @@ class ScanConfig:
 
 
 @dataclass(frozen=True)
-class TrainerConfig:
-    fix_tolerance: int
-
-
-@dataclass(frozen=True)
 class ReportConfig:
     depth: int
     error_loss: int
@@ -66,19 +61,12 @@ class SummaryConfig:
 class DrillConfig:
     depth: int
     multipv: int
-    seed: int
-    threat_min_loss: int
-    threat_min_before: int
-    threat_min_move: int
+    mistake_min_loss: int
+    mistake_min_before: int
+    mistake_max_after: int
+    mistake_min_move: int
     accept_within: int
     accept_min_gain: int
-    safe_max_loss: int
-    safe_min_move: int
-    safe_after_min: int
-    safe_after_max: int
-    safe_max_opp_eval: int
-    safe_sample_rate: float
-    safe_ratio: float
 
 
 @dataclass(frozen=True)
@@ -104,15 +92,34 @@ class ScoutConfig:
 
 
 @dataclass(frozen=True)
+class OpeningsConfig:
+    """Openings (web only): the book built from the Lichess database, and the quest through it."""
+    book_month: str
+    book_games: int
+    book_min_elo: int
+    book_max_elo: int
+    book_min_base: int
+    book_plies: int
+    book_min_games: int
+    book_depth: int
+    answer_tolerance: int
+    side_min_share: float
+    side_max: int
+    trap_max_loss: int
+    trap_reply_loss: int
+    trap_min_share: float
+
+
+@dataclass(frozen=True)
 class Config:
     engine: EngineConfig
     fetch: FetchConfig
     scan: ScanConfig
-    trainer: TrainerConfig
     report: ReportConfig
     summary: SummaryConfig
     drills: DrillConfig
     scout: ScoutConfig
+    openings: OpeningsConfig
 
 
 def _build(cls, table: dict, section: str):
@@ -135,9 +142,9 @@ def load(path: str | Path | None = None) -> Config:
         engine=_build(EngineConfig, engine, "engine"),
         fetch=_build(FetchConfig, {**raw["fetch"], "time_classes": tuple(raw["fetch"]["time_classes"])}, "fetch"),
         scan=_build(ScanConfig, raw["scan"], "scan"),
-        trainer=_build(TrainerConfig, raw["trainer"], "trainer"),
         report=_build(ReportConfig, raw["report"], "report"),
         summary=_build(SummaryConfig, raw["summary"], "summary"),
         drills=_build(DrillConfig, raw["drills"], "drills"),
         scout=_build(ScoutConfig, raw["scout"], "scout"),
+        openings=_build(OpeningsConfig, raw["openings"], "openings"),
     )

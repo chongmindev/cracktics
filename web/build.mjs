@@ -8,6 +8,7 @@ mkdirSync(new URL("engine/", out), { recursive: true });
 cpSync(new URL("./index.html", import.meta.url), new URL("index.html", out));
 cpSync(new URL("./favicon.svg", import.meta.url), new URL("favicon.svg", out));
 cpSync(new URL("./scout/", import.meta.url), new URL("scout/", out), { recursive: true });
+cpSync(new URL("./openings/", import.meta.url), new URL("openings/", out), { recursive: true });   // page and book.json
 cpSync(new URL("./prep/", import.meta.url), new URL("prep/", out), { recursive: true });   // old address: redirects to scout/
 cpSync(new URL("./src/", import.meta.url), new URL("src/", out), { recursive: true });
 cpSync(new URL("./styles/", import.meta.url), new URL("styles/", out), { recursive: true });

@@ -1,13 +1,12 @@
 # Cracktics
 
-Most chess trainers drill finding *your own* winning tactic. This one drills the other half of a blunder
-check: **after my move, what can my opponent do to me?**
+Chess training built from **your own games**. It reads your finished games, runs Stockfish over them, and
+takes you back to the positions where you went wrong:
 
-It reads your finished Chess.com games, runs Stockfish over them, and builds a deck of positions taken
-right after one of your moves:
-
-- **Threat positions:** your move lost 2.5+ pawns to a check or capture. Find the punishing reply.
-- **Safe positions:** your move was fine. Recognise that nothing works, without over-worrying.
+- **The drill:** the position just before one of your mistakes (a move that cost a pawn or more while the game
+  was still alive). Find a move as good as the engine's. A wrong try keeps the board live; **Hint** marks the
+  piece to move, **Show me** gives the answer. Then the best move's idea is stepped on the board, with what your
+  game move allowed one click away.
 
 The trainer shows each position from your side of the board, takes your answer as a move on the board,
 and schedules positions with spaced repetition (Leitner boxes).
@@ -15,6 +14,26 @@ and schedules positions with spaced repetition (Leitner boxes).
 > The web app runs entirely in the browser, for anyone with a Chess.com or Lichess username:
 > **https://chongmindev.github.io/cracktics/** (source in [`web/`](web/)). The Python pipeline, MCP server
 > and single-file trainer below read Chess.com only.
+
+## Openings
+
+**https://chongmindev.github.io/cracktics/openings/** is a quest through every line of an opening. Pick one
+(or every opening at once) and a side; you play your moves from move one, and the other side answers with the
+moves people really play, a different one each time:
+
+- the most played moves, down to 4% of games, and the sidelines behind them (`side_min_share`, `side_max`);
+- the engine's favourite among the moves people play;
+- common mistakes, where your job is to punish them;
+- rare traps: moves that cost them little where the most played answer is a mistake.
+
+At each of your turns a move counts when it is within 0.4 of the best (`answer_tolerance`). Your repertoire move
+is the most played move that good, and the quest carries on with it; a line ends where the book runs out. Lines
+you haven't finished come first, then the ones you answered worst. Progress stays in your browser.
+
+The book is built once from the [Lichess open database](https://database.lichess.org/) (CC0): 2 million rated
+games from September 2026, both players 1200–2300, blitz and slower, every position played 40+ times, each
+evaluated by Stockfish at depth 16 (`tools/build_book.py`, settings in `[openings]`). A move the book doesn't
+have is judged by the Lichess cloud or Stockfish in your browser.
 
 ## Scout
 
@@ -52,7 +71,7 @@ uv sync
 # 1. Finished games from the Chess.com archives (rapid, last two monthly archives by default)
 uv run cracktics fetch <username> data/games.pgn [--months 2] [--time-class rapid|blitz|bullet|daily|all]
 
-# 2. Drill positions (both colors by default)
+# 2. Drill positions: the moment before each of your mistakes (both colors by default)
 uv run cracktics drills data/games.pgn data/items.json --user <username> [--color white|black|both]
 
 # 3. Bake them into the trainer, then open it in a browser
@@ -87,9 +106,9 @@ again with the same arguments returns the result once it is done.
 
 ## Configuration
 
-Every depth and threshold lives in [`config.toml`](config.toml): engine settings, what counts as a threat
-or a safe move, which replies are accepted, phase boundaries for the summary, and the Chess.com fetch
-settings (request pacing, time classes).
+Every depth and threshold lives in [`config.toml`](config.toml): engine settings, what counts as a mistake
+worth a puzzle, which answers are accepted, phase boundaries for the summary, the Openings book and quest, and
+the Chess.com fetch settings (request pacing, time classes).
 
 ## Fair play
 
@@ -112,6 +131,12 @@ uv run pytest
 
 Tests cover the selection rules on fake engine output, known blunders on the real engine (skipped if
 Stockfish is missing), the Chess.com fetcher with a fake HTTP layer, and the MCP tools end to end.
+
+Rebuilding the opening book (about 5 minutes to count, then Stockfish on every position):
+
+```
+uv run --with zstandard python tools/build_book.py all
+```
 
 Project notes and the roadmap are in [`HANDOFF.md`](HANDOFF.md).
 
