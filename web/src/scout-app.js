@@ -513,7 +513,15 @@ async function main() {
     const accounts = [{ site: $("site").value, username }];
     const other = $("username2").value.trim();
     if (!$("also").hidden && other) accounts.push({ site: $("site2").value, username: other });
-    analyze(accounts, $("range").value, timeClasses, sideNow());
+    analyze(accounts, $("range").value, timeClasses, sideNow()).catch((err) => {
+      // Anything unexpected ends the run with a message, instead of a status line that never moves.
+      console.error(err);
+      state = null;
+      setStatus("");
+      $("error").textContent = `Something went wrong: ${err.message}`;
+      $("error").hidden = false;
+      document.body.dataset.view = "intro";
+    });
   });
 }
 
