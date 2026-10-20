@@ -417,14 +417,20 @@ function paintStats() {
 
 // ---------- page ----------
 
-function fillOpenings(sel, index = {}) {
-  const el = $("opening");
+/**
+ * The opening list for the side you play: openings you choose first, then the ones you'll meet (the other side's
+ * choices), each most played first, with the share of the book's games that reach it.
+ */
+function fillOpenings(sel, index = {}, side = "w") {
+  const el = $("opening"), other = side === "w" ? "b" : "w";
+  const share = (f) => { const x = (100 * f.n) / book.n; return x >= 1 ? `${Math.round(x)}%` : x >= 0.1 ? `${x.toFixed(1)}%` : "<0.1%"; };
   const prog = (name) => ["w", "b"].map((c) => index[`quest|${name}|${c}`]).map((x, i) => x?.done ? ` · ${x.done}/${x.total} as ${COLOR["wb"[i]]}` : "").join("");
   const top = fams.filter((f) => f.n >= book.n * 0.0005);
   const group = (label, side) => `<optgroup label="${label}">` + top.filter((f) => f.side === side)
-    .map((f) => `<option value="${esc(f.name)}" data-side="${f.side}">${esc(f.name)} · ${esc(numbered(f.path))}${prog(f.name)}</option>`).join("") + "</optgroup>";
-  el.innerHTML = `<option value="${ALL}">Your whole repertoire, from move one${prog("Whole repertoire")}</option>` + group("Openings White chooses", "w") + group("Openings Black chooses", "b");
-  sel.select.value = sel.select.querySelector(`option[value="${CSS.escape(sel.value || "")}"]`) ? sel.value : (top[0]?.name ?? ALL);
+    .map((f) => `<option value="${esc(f.name)}" data-side="${f.side}">${esc(f.name)} · ${esc(numbered(f.path))} · ${share(f)}${prog(f.name)}</option>`).join("") + "</optgroup>";
+  el.innerHTML = `<option value="${ALL}">Your whole repertoire, from move one${prog("Whole repertoire")}</option>` +
+    group(`Your openings as ${COLOR[side]} (you choose)`, side) + group(`Openings you'll face (${COLOR[other]} chooses)`, other);
+  sel.select.value = sel.select.querySelector(`option[value="${CSS.escape(sel.value || "")}"]`) ? sel.value : (top.find((f) => f.side === side)?.name ?? ALL);
 }
 
 async function main() {
@@ -458,16 +464,17 @@ async function main() {
   setStatus("");
   fams = families(book);
   const last = await store.get("openings-last");
-  fillOpenings({ select: $("opening"), value: last?.opening }, (await store.get("openings-index")) || {});
-  const openingSel = new Select($("opening"));
-  const sideFor = () => $("opening").selectedOptions[0]?.dataset.side;
   const pickSide = (s) => { const r = document.querySelector(`input[name=side][value="${s}"]`); if (r) r.checked = true; };
-  pickSide(last?.side || sideFor() || "w");
-  $("opening").addEventListener("change", () => { const s = sideFor(); if (s) pickSide(s); });
+  pickSide(last?.side || "w");
+  const refill = async () => fillOpenings({ select: $("opening"), value: $("opening").value || last?.opening }, (await store.get("openings-index")) || {}, sideNow());
+  await refill();
+  const openingSel = new Select($("opening"));
+  // The list follows the side you play (the opening you picked stays picked).
+  document.querySelectorAll("input[name=side]").forEach((r) => r.addEventListener("change", async () => { await refill(); openingSel.sync(); }));
   openingSel.sync();
   $("btn-go").disabled = false;
   $("btn-change").addEventListener("click", async () => {
-    fillOpenings({ select: $("opening"), value: $("opening").value }, (await store.get("openings-index")) || {});
+    await refill();
     openingSel.sync();
     $("start").classList.add("open");
   });
