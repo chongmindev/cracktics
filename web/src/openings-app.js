@@ -130,6 +130,9 @@ async function step() {
     await sleep(THEIR_PAUSE);
     play(san, "them", cand);
     q.them = why;
+    // The "Right…" box goes once the line moves on; a punished mistake stays until your next move.
+    if (!q.keepNote) note("");
+    q.keepNote = false;
     q.busy = false;
   }
   q.marks = {};
@@ -204,10 +207,13 @@ async function answer(m) {
     if (loss == null) { paint(); return note("Couldn't check that move. Try another."); }
   }
   if (m.san === rep?.san || loss <= O.answer_tolerance) return accept(m, rep, loss, null, child);
+  // The eval for you before and after (the book's eval of the position, less what the move gives away).
+  const sign = q.me === "w" ? 1 : -1, sgn = (cp) => `${cp > 0 ? "+" : cp < 0 ? "−" : ""}${pawns(Math.abs(cp))}`;
+  const evals = nd.e != null ? ` (${sgn(sign * nd.e)} → ${sgn(sign * nd.e - loss)} for you)` : "";
   const popular = kidsOf(nd)[0];
   const trapped = popular && popular.san === m.san && q.log.at(-1)?.cand?.kinds.includes("trap");
-  miss(m, trapped ? `<b>${esc(m.san)}</b> is the move most people play here, and it's the trap: it gives away ${pawns(loss)}.`
-    : `<b>${esc(m.san)}</b> gives away ${pawns(loss)} here.`, { reply, child, nd });
+  miss(m, trapped ? `<b>${esc(m.san)}</b> is the move most people play here, and it's the trap: it gives away ${pawns(loss)}${evals}.`
+    : `<b>${esc(m.san)}</b> gives away ${pawns(loss)} here${evals}.`, { reply, child, nd });
 }
 
 function grade(ok) {
@@ -315,6 +321,7 @@ async function accept(m, rep, loss, why = null, child = null) {
   else if (m.san === rep.san) text = `Right${mine ? `: the main move here, played in ${pct(mine)} of games` : ""}.`;
   else text = `Good too${loss > 0 ? ` (only ${pawns(loss)} off the best)` : ""}. Your repertoire move here is <b>${esc(rep.san)}</b>${rep.node ? `, played in ${pct(rep.node)} of games` : ""}; the quest goes on with it.`;
   note(text + reveal);
+  q.keepNote = !!reveal;
   const san = m.san === rep.san ? m.san : rep.san;
   if (san !== m.san) {
     q.game.move(m.san);       // show your move, then swap in the repertoire move

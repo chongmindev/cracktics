@@ -25,6 +25,11 @@ const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(pre
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const fmt = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1);
+/** An eval for me: "#3" (I mate in 3), "−#2" (I get mated), else "+1.2". mate: moves, my view; v: pawns, my view. */
+const fmtEval = (v, mate = null) => (mate ? (mate > 0 ? `#${mate}` : `−#${-mate}`) : fmt(v));
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "2026-10-17" -> "Oct 17, 2026" (or the text as it is, if it isn't a date). */
+const dateText = (d) => { const [y, m, day] = String(d || "").split(/[-.]/); return MONTHS[m - 1] && +day ? `${MONTHS[m - 1]} ${+day}, ${y}` : d || ""; };
 const num = (n, white, san) => `${n}${white ? "." : "…"}${san}`;
 
 /** Position of a pawn value on the eval bar, in percent from the left (my side winning = right). */
@@ -318,15 +323,26 @@ export class Trainer {
     const best = m && m.san === cur.better;
     const others = cur.accept_san.filter((x) => x !== cur.better && x !== m?.san);
     const head = shown ? "Here it is" : this.firstTry ? (best ? "Best move" : "Good move") : "Got there";
+    // Every card shows its eval for you: the best move's is the position's eval before the mistake.
+    const bestEv = fmtEval(cur.evb, cur.mate);
+    const pending = !shown && !best && evalAfter == null && this.evaluate;   // another accepted move: ask the engine
     const yours = shown ? "" : this.card(best ? "Your move · engine's choice" : "Your move holds", num(cur.move, white, m.san), "key",
-      evalAfter != null ? `${fmt(evalAfter)} for you` : best ? "" : "as good as the best");
+      evalAfter != null ? fmt(evalAfter) : best ? bestEv : pending ? "…" : "as good as the best");
     const cards = yours +
-      (best && !shown ? "" : this.card("Best move", num(cur.move, white, cur.better), shown ? "key" : "")) +
-      this.card("In the game you played", num(cur.move, white, cur.san), "struck", `cost ${cur.swing.toFixed(1)}`);
+      (best && !shown ? "" : this.card("Best move", num(cur.move, white, cur.better), shown ? "key" : "", bestEv)) +
+      this.card("In the game you played", num(cur.move, white, cur.san), "struck", `${fmt(cur.eva)} · cost ${cur.swing.toFixed(1)}`);
     const also = others.length ? `<p class="also label">Also good: ${others.map(esc).join(", ")}</p>` : "";
     const see = cur.reply ? `<button type="button" class="link-btn see-played">What ${esc(cur.san)} allowed: ${esc(cur.reply)}</button>` : "";
     const bar = cur.mate ? `<div class="mate">Mate in ${cur.mate} for you</div>` : this.evalBar(cur.evb, cur.eva);
     this.feedback(!shown && this.firstTry === true, head, cards, bar + also + see);
+    if (pending) {
+      this.evaluate(this.after(cur.before_fen, m)).then((l) => {
+        const sub = this.cur === cur && this.els.feedback.querySelector(".card.key .sub");
+        if (!sub || !l) return;
+        const sign = white ? 1 : -1;
+        sub.textContent = fmtEval((sign * l.cp) / 100, l.mate ? sign * l.mate : null);
+      }).catch(() => {});
+    }
     this.finish();
     this.walk(cur);
   }
@@ -508,7 +524,7 @@ export class Trainer {
   next() {
     this.cur = this.pick();
     if (!this.cur) return;
-    const cur = this.cur, [, mo, d] = cur.date.split("-");
+    const cur = this.cur;
     this.game = new Chess(cur.before_fen);
     this.sel = null;
     this.step = "solve";
@@ -521,7 +537,7 @@ export class Trainer {
     this.frames = [];
     this.beforeIdx = this.addFrame(cur.before_fen, null, null, null, "");
     this.view = this.beforeIdx;
-    this.els.meta.innerHTML = `<span>vs ${esc(cur.opp)}</span><span>${+mo}/${+d}</span><span>${RESULT[cur.result] || ""}</span>`;
+    this.els.meta.innerHTML = `<span>vs ${esc(cur.opp)}</span><span>${esc(dateText(cur.date))}</span><span>${RESULT[cur.result] || ""}</span>`;
     this.els.question.textContent = `Find the best move for ${this.me()}.`;
     this.els.context.textContent = `You went wrong here in this game. ${cur.mate ? `There's a mate in ${cur.mate}.` : ""}`.trim();
     if (this.els.side) this.els.side.textContent = `You play ${this.me()}`;
