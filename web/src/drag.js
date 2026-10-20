@@ -1,13 +1,15 @@
-// Picking pieces up. Pressing on one of your pieces lifts it: it grows, casts a shadow, bobs gently and tilts as
-// you move it, and follows the pointer until you drop it on a square. Tapping still works (tap the piece, tap where
-// it goes): a press and release on the same square is a tap. Keyboard clicks (Enter / Space) are left alone.
+// Picking pieces up. Pressing on one of your pieces lifts it: it grows a little, casts a shadow and tilts as you
+// move it, centred on the pointer (a little above a finger, so the finger doesn't hide it) until you drop it on a
+// square. Tapping still works (tap the piece, tap where it goes): a press and release on the same square is a tap,
+// and the piece pops up and settles back so the tap is felt. Keyboard clicks (Enter / Space) are left alone.
 //
 // The boards redraw their squares on every change, so this listens on the board element itself and asks the page
 // what it may lift; it only ever calls the page's own tap(square), the same as a click.
 
 const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const DRAG_PX = 4;        // movement before a press counts as a drag rather than a tap
-const SETTLE_MS = 110;    // the lifted piece gliding onto its square when dropped
+const SETTLE_MS = 140;    // the lifted piece gliding onto its square (or back home) when dropped
+const TOUCH_RISE = 0.35;  // on touch, the piece rides this many squares above the finger
 
 /**
  * board: the .board element. canLift(square): may the player pick up what's there now?
@@ -15,14 +17,16 @@ const SETTLE_MS = 110;    // the lifted piece gliding onto its square when dropp
  */
 export function liftPieces(board, { canLift, tap, selected }) {
   board.classList.add("can-lift");
-  let press = null;   // {sq, x, y, wasSel, lifted: {el, size}, moved, over, tilt, lastX, raf}
+  let press = null;   // {sq, x, y, wasSel, lifted: {el, size}, moved, over, tilt, lastX, raf, rise}
 
   const squareAt = (x, y) => document.elementFromPoint(x, y)?.closest?.(".sq");
   const sqEl = (s) => board.querySelector(`[data-sq="${s}"]`);
 
   function place(x, y) {
+    // Position in `translate`, not `transform`: the lift's `scale` would multiply a transform's offset as well.
     const { el, size } = press.lifted;
-    el.style.transform = `translate(${x - size / 2}px, ${y - size * 0.62}px) rotate(${press.tilt.toFixed(1)}deg)`;
+    el.style.translate = `${x - size / 2}px ${y - size / 2 - press.rise * size}px`;
+    el.style.rotate = `${press.tilt.toFixed(1)}deg`;
   }
 
   function lift(sqNode, x, y) {
@@ -65,7 +69,8 @@ export function liftPieces(board, { canLift, tap, selected }) {
     const home = sqEl(dropSq || p.sq)?.getBoundingClientRect();
     if (home && !reducedMotion()) {
       el.classList.add("settling");
-      el.style.transform = `translate(${home.left + (home.width - size) / 2}px, ${home.top + (home.height - size) / 2}px)`;
+      el.style.translate = `${home.left + (home.width - size) / 2}px ${home.top + (home.height - size) / 2}px`;
+      el.style.rotate = "0deg";
       setTimeout(() => el.remove(), SETTLE_MS);
     } else el.remove();
   }
@@ -76,7 +81,8 @@ export function liftPieces(board, { canLift, tap, selected }) {
     if (!node || !board.contains(node)) return;
     e.preventDefault();   // no text selection or native image drag while holding a piece
     const sq = node.dataset.sq;
-    press = { sq, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, wasSel: selected() === sq, lifted: null, moved: false, over: null, tilt: 0, raf: null };
+    press = { sq, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, wasSel: selected() === sq, lifted: null, moved: false, over: null, tilt: 0, raf: null,
+      rise: e.pointerType === "touch" ? TOUCH_RISE : 0 };
     board.setPointerCapture?.(e.pointerId);
     if (!canLift(sq)) return;
     if (!press.wasSel) tap(sq);   // select it: the board redraws with its targets marked

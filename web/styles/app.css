@@ -85,9 +85,14 @@ a:hover { border-bottom-color: var(--accent); }
 /* Last move: an accent frame, no fill, so it reads on light and dark squares alike. */
 .sq .lm { position: absolute; inset: 0; box-shadow: inset 0 0 0 3px var(--board-mark); pointer-events: none; }
 .sq.sel { box-shadow: inset 0 0 0 4px var(--ink); }
-/* Legal targets of the selected piece: a thin frame, no center dots. */
-.sq .target { position: absolute; inset: 0; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ink) 45%, transparent); pointer-events: none; }
-.sq:hover .target { box-shadow: inset 0 0 0 3px var(--ink); }
+/* Legal targets of the selected piece: a dot on an empty square, a ring round a piece it can take; the square
+   under the pointer gets a frame too. */
+.sq .target { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--ink) 42%, transparent) 0 17%, transparent 18%); }
+.sq:has(.pc) .target { background: radial-gradient(circle, transparent 0 64%, color-mix(in srgb, var(--ink) 42%, transparent) 65%); }
+.sq:hover .target, .sq.drop-over .target { box-shadow: inset 0 0 0 3px var(--ink); }
+.sq:hover:not(:has(.pc)) .target, .sq.drop-over:not(:has(.pc)) .target {
+  background: radial-gradient(circle, color-mix(in srgb, var(--ink) 65%, transparent) 0 19%, transparent 20%); }
 /* Checks / captures chip: a corner flag on each from- and to-square. */
 .sq .hintmark { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(135deg, var(--board-mark) 0 16%, transparent 16%); }
 .sq .loose { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(-45deg, transparent 0 6px, color-mix(in srgb, var(--board-mark) 40%, transparent) 6px 8px); box-shadow: inset 0 0 0 2px var(--board-mark); }
@@ -506,19 +511,20 @@ svg.arrows polygon { fill: var(--ink); }
 .fb .also { margin: 0; }
 .fb .see-played { justify-self: start; text-transform: none; }
 
-/* Picking a piece up (src/drag.js): the lifted copy follows the pointer, larger, shadowed, bobbing a little;
-   the piece left on its square fades while it's in the air. */
+/* Picking a piece up (src/drag.js): the lifted copy follows the pointer, a little larger and shadowed; it pops up
+   on the press and settles onto its square on release (so a plain click shows a quick lift and put-down).
+   drag.js positions it with `translate`, so `scale` grows it in place. */
 .board.can-lift { touch-action: none; }
 .board[data-lifting] .sq.sel .pc { opacity: 0.25; }
 .sq.drop-over { box-shadow: inset 0 0 0 4px var(--ink); }
 .pc.lifted {
   position: fixed; left: 0; top: 0; z-index: 1000; pointer-events: none;
-  scale: 1.18; filter: drop-shadow(0 12px 10px rgb(0 0 0 / 0.35));
-  animation: lift-bob 1.3s ease-in-out infinite;
+  scale: 1.12; filter: drop-shadow(0 10px 8px rgb(0 0 0 / 0.32));
+  animation: lift-in 90ms ease-out;
 }
-.pc.lifted.settling { scale: 1; filter: none; animation: none; transition: transform 110ms ease-out, scale 110ms ease-out; }
-@keyframes lift-bob { 0%, 100% { translate: 0 -3px; } 50% { translate: 0 3px; } }
-@media (prefers-reduced-motion: reduce) { .pc.lifted { animation: none; } }
+.pc.lifted.settling { scale: 1; filter: none; animation: none; transition: translate 140ms ease-out, scale 140ms ease-out, rotate 140ms ease-out, filter 140ms ease-out; }
+@keyframes lift-in { from { scale: 1; filter: none; } }
+@media (prefers-reduced-motion: reduce) { .pc.lifted { animation: none; } .pc.lifted.settling { transition: none; } }
 
 /* Next stays in view once it shows: stuck to the bottom of the panel on desktop, of the screen on phones (where the
    page scrolls, so the panel mustn't be a scroll box of its own). Explanations that load after it can't push it out. */
