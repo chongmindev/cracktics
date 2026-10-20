@@ -518,3 +518,9 @@ svg.arrows polygon { fill: var(--ink); }
 .pc.lifted.settling { scale: 1; filter: none; animation: none; transition: transform 110ms ease-out, scale 110ms ease-out; }
 @keyframes lift-bob { 0%, 100% { translate: 0 -3px; } 50% { translate: 0 3px; } }
 @media (prefers-reduced-motion: reduce) { .pc.lifted { animation: none; } }
+
+/* Next stays in view once it shows: stuck to the bottom of the panel on desktop, of the screen on phones (where the
+   page scrolls, so the panel mustn't be a scroll box of its own). Explanations that load after it can't push it out. */
+.drill .btns:has(#btn-next:not([hidden])) { position: sticky; bottom: 0; z-index: 2; padding: 10px 0 12px; background: var(--paper);
+  box-shadow: 0 -10px 10px -10px color-mix(in srgb, var(--ink) 35%, transparent); }
+@media (max-width: 1023px), (max-height: 699px) { .drill { overflow: visible; } }

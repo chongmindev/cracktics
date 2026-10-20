@@ -434,6 +434,11 @@ export function openingMiss({ path, played, reply = null, line = null }) {
   } else if (pm.piece !== "p" && landed.has(pm.from) && !pm.captured && minorsHome >= 1)
     reasons.push(`Moves your ${NAME[pm.piece]} a second time while ${minorsHome === 1 ? "a piece still sits" : `${minorsHome} pieces still sit`} at home.`);
 
+  // A rook move from its corner while the king could still castle that way.
+  if (pm.piece === "r" && !pm.captured && (pm.from === "h" + home || pm.from === "a" + home)) {
+    const right = pm.from[0] === "h" ? (me === "w" ? "K" : "k") : (me === "w" ? "Q" : "q");
+    if (before.split(" ")[2].includes(right)) reasons.push(`Moves the rook from ${pm.from}, so you can't castle ${pm.from[0] === "h" ? "kingside" : "queenside"} any more.`);
+  }
   // A piece in front of an unmoved centre pawn, or a pawn move that shuts in a bishop still at home.
   const behind = pm.to[0] + pawnHome;
   if ("nb".includes(pm.piece) && "cde".includes(pm.to[0]) && Math.abs(+pm.to[1] - +pawnHome) === 1 &&

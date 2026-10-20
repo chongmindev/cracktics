@@ -120,6 +120,9 @@ test("openingMiss: what's wrong with an opening move, without naming the right o
   // 1.e4 e6 2.d4 b6: a flank pawn while the pieces wait.
   r = openingMiss({ path: ["e4", "e6", "d4"], played: "b6" });
   assert.match(r.reasons[0], /pawn move on the edge/);
+  // 1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.Rf1: no more kingside castling.
+  r = openingMiss({ path: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5"], played: "Rf1" });
+  assert.ok(r.reasons.some((x) => /can't castle kingside/.test(x)));
   // A quiet centre move: nothing to say from the board alone.
   r = openingMiss({ path: ["e4", "e5", "Nf3", "Nc6"], played: "c3" });
   assert.deepEqual(r.reasons, []);

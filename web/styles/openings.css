@@ -34,3 +34,8 @@ svg.arrows g.them line { stroke: var(--accent); }
 svg.arrows g.them polygon { fill: var(--accent); }
 svg.arrows g.wrong line { stroke: var(--ink-muted); stroke-dasharray: 0.12 0.1; }
 svg.arrows g.wrong polygon { fill: var(--ink-muted); }
+
+/* Next line stays in view (see the same rule for Rewind in app.css) */
+.q-actions:has(#btn-next:not([hidden])) { position: sticky; bottom: 0; z-index: 2; padding: 10px 0 12px; background: var(--paper);
+  box-shadow: 0 -10px 10px -10px color-mix(in srgb, var(--ink) 35%, transparent); }
+@media (max-width: 1023px), (max-height: 699px) { .openings-page .pane { overflow: visible; } }
