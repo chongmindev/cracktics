@@ -6,6 +6,7 @@
 import { Chess } from "chess.js";
 import { Board } from "./board.js";
 import { liftPieces } from "./drag.js";
+import { EvalBar } from "./evalbar.js";
 import { EnginePool, Evaluator, LichessCloud } from "./evals.js";
 import { numbered as plyText, openingMiss } from "./explain.js";
 import { at, candidates, chooseMove, families, fenAt, kidsOf, lossOf, nameAt, pathKey, posKey, questTree, rankText, repertoire, scoreOf, turnOf } from "./quest.js";
@@ -27,6 +28,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const ALL = "__all__";   // the opening select's "every opening, from move one"
 
 let book = null, fams = [], store = null, board = null, evaluate = null, analysePv = null;
+let evalBar = null, shownFen = null;
+const evalCache = new Map();   // fen -> Promise<{cp, mate}> (White's view), for positions the book has no eval for
 let verdicts = null;   // openings/moves.json: {pos: {position key: {san: loss | [loss, reply]}}}, every move at every quest position
 let q = null;   // the quest: {fam, me, entry, leaves, count, prog, key, path, game, sel, marks, misses, firstTry, busy, phase, last, view}
 
@@ -402,6 +405,7 @@ function paint() {
       arrows: [...(q.view.k === 0 ? [{ from: w.from, to: w.to, weight: 0.4, kind: "wrong" }] : []),
         { from: q.view.last.from, to: q.view.last.to, weight: 1, kind: "them" }] });
   } else board.draw(q.game.fen(), { last: q.last, onTap, sel: q.sel, targets, marks: q.marks });
+  paintEval(q.view ? q.view.fen : q.game.fen(), q.view ? null : at(book, q.path));
   const name = nameAt(book, q.path);
   $("q-name").innerHTML = name ? `<span class="label">${esc(name[0])}</span> ${esc(name[1])}` : "Starting position";
   $("q-line").innerHTML = q.log.map((x, i) =>
@@ -411,6 +415,17 @@ function paint() {
   $("q-them").textContent = myTurn && q.path.length > q.entry.length ? q.them || "" : "";
   paintSeen(myTurn);
   paintStats();
+}
+
+/** The eval bar and "Eval: you +0.3": the book's eval when the position is in it, else the engine's. */
+function paintEval(fen, nd) {
+  if (!evalBar) return;
+  shownFen = fen;
+  const meW = q.me === "w";
+  if (nd?.e != null && Math.abs(nd.e) < cfg.engine.mate_score / 2) return evalBar.set(nd.e, null, meW);
+  evalBar.clear(true);
+  if (!evalCache.has(fen)) evalCache.set(fen, engine().then((ev) => ev(fen)).catch(() => null));
+  evalCache.get(fen).then((l) => { if (l && shownFen === fen) evalBar.set(l.cp, l.mate || null, q.me === "w"); });
 }
 
 /** Have you been here before: this position (and how it went last time), and the lines through it. */
@@ -457,6 +472,7 @@ async function main() {
   document.fonts?.ready.then(fitHero);
   new ResizeObserver(fitHero).observe(document.querySelector(".stage"));
   board = new Board($("board"), $("arrows"));
+  evalBar = new EvalBar($("board").parentElement, $("q-eval"));
   liftPieces(board.el, {
     canLift: (s) => !!q && !q.busy && q.phase === "play" && turnOf(q.path) === q.me && q.game.get(s)?.color === q.game.turn(),
     tap: (s) => onTap(s),

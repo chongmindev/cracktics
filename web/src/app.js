@@ -132,10 +132,11 @@ async function main() {
     feedback: $("feedback"), drill: document.querySelector(".drill"), note: $("note"), hint: $("btn-hint"), showMe: $("btn-show"),
     actions: $("actions"), next: $("btn-next"),
     material: $("material"),
+    evalLabel: $("eval-label"),
     side: $("device-side"), boxes: $("boxes"),
     done: $("st-done"), acc: $("st-acc"), streak: $("st-streak"),
   }, { load: async () => null, save: async () => {}, within: cfg.drills.accept_within, gain: cfg.drills.accept_min_gain,
-    cue: (kind) => sound.play(kind) });
+    evalCap: cfg.engine.eval_cap, cue: (kind) => sound.play(kind) });
 
   // Site switch: the username label follows it; the button says Continue when this player has progress here.
   const paintCta = async () => {

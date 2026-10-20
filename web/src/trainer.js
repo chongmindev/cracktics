@@ -11,6 +11,7 @@
 
 import { Chess } from "chess.js";
 import { liftPieces } from "./drag.js";
+import { EvalBar } from "./evalbar.js";
 import { material, numbered, punishment, walkthrough } from "./explain.js";
 
 export { material };
@@ -64,8 +65,12 @@ export class Trainer {
    * analyse(fen) -> Promise<[{cp, mate, pv}]> from White's view, with the whole line: explains the moves.
    * within, gain: centipawns (drills.accept_within, drills.accept_min_gain). cue(kind): "right" / "wrong", for a sound.
    */
-  constructor(els, { load, save, evaluate = null, analyse = null, within = 50, gain = 75, cue = () => {} }) {
-    Object.assign(this, { els, load, save, evaluate, analyse, within, gain, cue });
+  constructor(els, { load, save, evaluate = null, analyse = null, within = 50, gain = 75, evalCap = 2000, cue = () => {} }) {
+    Object.assign(this, { els, load, save, evaluate, analyse, within, gain, evalCap, cue });
+    // The eval of the position on the board, beside it; fen -> {cp, mate} from White's view, from the deck or the engine.
+    this.bar = els.board.parentElement ? new EvalBar(els.board.parentElement, els.evalLabel || null) : null;
+    this.evals = new Map();
+    this.asked = new Set();
     this.items = [];
     this.progress = Trainer.freshProgress();
     this.cur = null;
@@ -143,7 +148,25 @@ export class Trainer {
     this.els.arrows.innerHTML = this.arrowFrame === this.view
       ? this.arrowList.map(([f, t, dashed]) => this.arrow(f, t, dashed)).join("") : "";
     this.paintMaterial();
+    this.paintEval();
     if (anim) this.animate(anim);
+  }
+
+  /** The bar and "Eval: you +1.2" for the frame on the board; the engine fills in positions the deck has no eval for. */
+  paintEval() {
+    const fr = this.frames[this.view];
+    if (!this.bar || !fr) return;
+    const known = this.evals.get(fr.fen);
+    if (known) return this.bar.set(known.cp, known.mate, this.meW());
+    this.bar.clear(true);
+    if (!this.evaluate || this.asked.has(fr.fen)) return;
+    const fen = fr.fen;
+    this.asked.add(fen);
+    this.evaluate(fen).then((l) => {
+      if (!l) return;
+      this.evals.set(fen, { cp: l.cp, mate: l.mate || null });
+      if (this.frames[this.view]?.fen === fen) this.bar.set(l.cp, l.mate || null, this.meW());
+    }).catch(() => {}).finally(() => this.asked.delete(fen));
   }
 
   // ---------- the line: frames, stepping, animation ----------
@@ -537,6 +560,11 @@ export class Trainer {
     this.hintSq = null;
     this.setArrows([], null);
     this.frames = [];
+    // The deck's evals (pawns, my view) for the puzzle and my game move, as White's view in centipawns.
+    // A clamped eval (at engine.eval_cap, give or take rounding; often a mate the deck doesn't record) is left for the engine.
+    const sign = cur.color === "w" ? 1 : -1, capped = (v) => Math.abs(v) * 100 >= this.evalCap - 10;
+    if (cur.mate || !capped(cur.evb)) this.evals.set(cur.before_fen, { cp: sign * Math.round(cur.evb * 100), mate: cur.mate ? sign * cur.mate : null });
+    if (!capped(cur.eva)) this.evals.set(cur.fen, { cp: sign * Math.round(cur.eva * 100), mate: null });
     // The puzzle opens on the position before their move and plays it, so you see what they just did. Older
     // decks (no prev) and a first move start on the puzzle itself.
     let prevMove = null;

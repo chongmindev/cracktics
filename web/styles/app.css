@@ -525,3 +525,18 @@ svg.arrows polygon { fill: var(--ink); }
 .drill .btns:has(#btn-next:not([hidden])) { position: sticky; bottom: 0; z-index: 2; padding: 10px 0 12px; background: var(--paper);
   box-shadow: 0 -10px 10px -10px color-mix(in srgb, var(--ink) 35%, transparent); }
 @media (max-width: 1023px), (max-height: 699px) { .drill { overflow: visible; } }
+
+/* ---------- Eval bar (evalbar.js): a strip off the board's left edge, your colour from the bottom ---------- */
+.boardbox { --evalw: 12px; --evalgap: 8px; }
+@media (max-width: 640px) { .boardbox { --evalw: 7px; --evalgap: 5px; } }
+.evalbar-v { position: absolute; top: -2px; bottom: -2px; left: calc(-1 * (var(--evalw) + var(--evalgap))); width: var(--evalw);
+  border: var(--thin); border-color: var(--ink); background: #1f1f1f; overflow: hidden; }
+.evalbar-v .fill { position: absolute; left: 0; right: 0; bottom: 0; height: var(--share, 50%); background: #f2f2f2;
+  transition: height 350ms cubic-bezier(.2,.7,.3,1); }
+.evalbar-v.black-bottom { background: #f2f2f2; }
+.evalbar-v.black-bottom .fill { background: #1f1f1f; }
+.evalbar-v .mid { position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--accent); opacity: 0.8; }
+.evalbar-v.pending .fill { opacity: 0.55; }
+.eval-label { color: var(--ink-muted); }
+.eval-label b { color: var(--ink); font-weight: 600; }
+@media (max-width: 640px) { .eval-label .words { display: none; } }
