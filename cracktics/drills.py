@@ -28,6 +28,7 @@ class Ply:
     before: int
     after: int
     fen_before: str = ""        # position before my move, me to move (for the trainer's "fix it" step)
+    prev: dict | None = None    # their move just before: {fen before it, from, to, san, promotion?} (the puzzle opens with it)
 
     @property
     def loss(self) -> int:
@@ -39,8 +40,12 @@ def walk(game: Game, engine: Engine, depth: int, cap: int) -> Iterator[Ply]:
     clamp = lambda v: max(-cap, min(cap, v))
     board = chess.Board()
     line = engine.analyse(board, depth)[0]
+    prev = None
     for i, mv in enumerate(game.moves):
         mine = board.turn == game.color
+        prev_move = prev
+        prev = {"fen": board.fen(), "from": chess.square_name(mv.from_square), "to": chess.square_name(mv.to_square),
+                "san": board.san(mv), **({"promotion": chess.piece_symbol(mv.promotion)} if mv.promotion else {})}
         if mine:
             before = clamp(line.pov(game.color))
             best_san = board.san(chess.Move.from_uci(line.move)) if line.move else None
@@ -52,7 +57,7 @@ def walk(game: Game, engine: Engine, depth: int, cap: int) -> Iterator[Ply]:
         line = engine.analyse(board, depth)[0]
         if mine:
             yield Ply(game, i // 2 + 1, board.copy(stack=False), mv, san, best_san,
-                      before, clamp(line.pov(game.color)), fen_before)
+                      before, clamp(line.pov(game.color)), fen_before, prev_move)
 
 
 def is_mistake_candidate(c: DrillConfig, p: Ply) -> bool:
@@ -101,7 +106,8 @@ def _base(p: Ply) -> dict:
             "from": chess.square_name(p.move.from_square), "to": chess.square_name(p.move.to_square),
             "san": p.san, "move": p.move_number, "opp": p.game.opponent, "date": p.game.date,
             "result": p.game.result, "evb": pawns(p.before), "eva": pawns(p.after),
-            **({"link": link} if (link := p.game.headers.get("Link")) else {})}
+            **({"link": link} if (link := p.game.headers.get("Link")) else {}),
+            **({"prev_fen": p.prev["fen"], "prev": {k: v for k, v in p.prev.items() if k != "fen"}} if p.prev else {})}
 
 
 def build_items(games: Iterable[Game], engine: Engine, cfg: Config) -> list[dict]:

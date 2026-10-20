@@ -63,19 +63,22 @@ export async function* walk(game, analyse, depth, cap) {
   const chess = new Chess();
   const seen = new Map([[positionKey(chess.fen()), 1]]);
   let line = (await analyse(chess.fen(), depth, 1))[0];
+  let prev = null;   // the move just before (theirs, when it's my turn): {fen before it, from, to, promotion, san}
   for (let i = 0; i < game.moves.length; i++) {
     const mine = chess.turn() === game.color;
     const fenBefore = chess.fen();
     const before = clamp(pov(line, game.color), cap);
     const bestSan = mine && line.move ? sanOf(fenBefore, line.move) : null;
     const m = moveOf(chess, uciOf(game.moves[i]));
+    const prevMove = prev;
+    prev = { fen: fenBefore, from: m.from, to: m.to, ...(m.promotion ? { promotion: m.promotion } : {}), san: m.san };
     const key = positionKey(chess.fen());
     seen.set(key, (seen.get(key) || 0) + 1);
     if (mine && isGameOver(chess, seen)) return;
     line = (await analyse(chess.fen(), depth, 1))[0];
     if (mine) {
       yield { game, moveNumber: Math.floor(i / 2) + 1, fenBefore, fen: chess.fen(), move: m, uci: uciOf(m),
-              san: m.san, bestSan, before, after: clamp(pov(line, game.color), cap) };
+              san: m.san, bestSan, prevMove, before, after: clamp(pov(line, game.color), cap) };
     }
   }
 }
@@ -92,7 +95,9 @@ async function base(p) {
   const g = p.game;
   return { id: await itemId(p.fen, p.uci), fen: p.fen, before_fen: p.fenBefore, color: g.color, from: p.move.from, to: p.move.to,
            san: p.san, move: p.moveNumber, opp: g.opponent, date: g.date, result: g.result,
-           evb: pawns(p.before), eva: pawns(p.after), ...(g.link ? { link: g.link } : {}) };
+           evb: pawns(p.before), eva: pawns(p.after), ...(g.link ? { link: g.link } : {}),
+           ...(p.prevMove ? { prev_fen: p.prevMove.fen, prev: { from: p.prevMove.from, to: p.prevMove.to, san: p.prevMove.san,
+             ...(p.prevMove.promotion ? { promotion: p.prevMove.promotion } : {}) } } : {}) };
 }
 
 /**

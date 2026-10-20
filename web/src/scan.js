@@ -13,8 +13,8 @@ export function rulesVersion(cfg) {
   return JSON.stringify({ items: ITEM_SCHEMA, drills: cfg.drills });
 }
 
-/** Bump when items gain or change fields, so cached candidates are rebuilt (2: before_fen; 3: mistakes). */
-const ITEM_SCHEMA = 3;
+/** Bump when items gain or change fields, so cached candidates are rebuilt (2: before_fen; 3: mistakes; 4: prev, their move before). */
+const ITEM_SCHEMA = 4;
 
 /**
  * Two phases, both newest game first:

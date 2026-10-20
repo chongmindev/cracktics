@@ -20,6 +20,8 @@ const FILES = "abcdefgh";
 const RESULT = { win: "Won", loss: "Lost", draw: "Drawn" };
 const EVAL_SPAN = 6;   // the eval bar runs from -6 to +6 pawns; beyond that (or mate) pins to the end
 const SLIDE_MS = 260;     // one move's slide
+const INTRO_WAIT_MS = 500;   // a new puzzle shows the position before their move this long...
+const INTRO_SLIDE_MS = 450;  // ...then plays their move, slower than a step
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -535,11 +537,19 @@ export class Trainer {
     this.hintSq = null;
     this.setArrows([], null);
     this.frames = [];
-    this.beforeIdx = this.addFrame(cur.before_fen, null, null, null, "");
-    this.view = this.beforeIdx;
+    // The puzzle opens on the position before their move and plays it, so you see what they just did. Older
+    // decks (no prev) and a first move start on the puzzle itself.
+    let prevMove = null;
+    try { if (cur.prev_fen && cur.prev) prevMove = new Chess(cur.prev_fen).move(cur.prev); } catch {}
+    const prevIdx = prevMove ? this.addFrame(cur.prev_fen, null, null, null, "") : null;
+    this.beforeIdx = this.addFrame(cur.before_fen, prevMove, prevIdx, prevMove ? "them" : null,
+      prevMove ? num(prevMove.color === "w" ? cur.move : cur.move - 1, prevMove.color === "w", prevMove.san) : "");
+    this.view = prevIdx ?? this.beforeIdx;
+    if (prevIdx != null) this.game = new Chess(cur.prev_fen);
     this.els.meta.innerHTML = `<span>vs ${esc(cur.opp)}</span><span>${esc(dateText(cur.date))}</span><span>${RESULT[cur.result] || ""}</span>`;
     this.els.question.textContent = `Find the best move for ${this.me()}.`;
-    this.els.context.textContent = `You went wrong here in this game. ${cur.mate ? `There's a mate in ${cur.mate}.` : ""}`.trim();
+    const theirs = prevMove ? `They just played ${this.frames[this.beforeIdx].san}. ` : "";
+    this.els.context.textContent = `${theirs}You went wrong here in this game. ${cur.mate ? `There's a mate in ${cur.mate}.` : ""}`.trim();
     if (this.els.side) this.els.side.textContent = `You play ${this.me()}`;
     this.els.board.setAttribute("aria-label", `Chess board, ${this.me()} at the bottom`);
     this.els.feedback.innerHTML = "";
@@ -551,5 +561,10 @@ export class Trainer {
     this.paintStep();
     this.paintStats();
     this.render();
+    clearTimeout(this.introTimer);
+    if (prevIdx != null) {
+      const go = () => this.goto(this.beforeIdx, { ms: INTRO_SLIDE_MS });
+      if (reducedMotion()) go(); else this.introTimer = setTimeout(go, INTRO_WAIT_MS);
+    }
   }
 }
