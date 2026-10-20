@@ -8,7 +8,7 @@ import { Board } from "./board.js";
 import { liftPieces } from "./drag.js";
 import { EnginePool, Evaluator, LichessCloud } from "./evals.js";
 import { numbered as plyText, openingMiss } from "./explain.js";
-import { at, candidates, chooseMove, families, kidsOf, lossOf, nameAt, pathKey, posKey, questTree, rankText, repertoire, scoreOf, turnOf } from "./quest.js";
+import { at, candidates, chooseMove, families, fenAt, kidsOf, lossOf, nameAt, pathKey, posKey, questTree, rankText, repertoire, scoreOf, turnOf } from "./quest.js";
 import { Select } from "./select.js";
 import { sound } from "./sound.js";
 import { IdbStore, MemoryStore } from "./store.js";
@@ -246,8 +246,8 @@ function sanOf(fen, uci) {
  * on the board like a drill's line when there's a tactic in it), and how it scores in the book's games.
  * The board shows your move and their answer; tap the board (or "Try again") to go back and find a better move.
  */
-async function explainMiss(m, head, { reply, child, nd }) {
-  const token = q.missToken = {}, path = [...q.path], fen = q.game.fen();
+async function explainMiss(m, head, { reply, child, nd }, { path = [...q.path], back = "Try again", onBack = null, label = "Their best answer" } = {}) {
+  const token = q.missToken = {}, fen = fenAt(path);
   const after = new Chess(fen); after.move(m.san);
   const replySan = reply ? sanOf(after.fen(), reply) : null;
   const stats = child && child.n >= O.book_min_games
@@ -261,11 +261,11 @@ async function explainMiss(m, head, { reply, child, nd }) {
       `<li><button type="button" data-k="${k}"><b>${esc(plyText(st.ply.before, st.ply.move))}</b><span>${st.text}</span></button></li>`).join("") : "";
     note(`<span class="miss-head">${head}</span>` +
       (reasons.length ? `<ul class="miss-why">${reasons.map((r) => `<li>${r}</li>`).join("")}</ul>` : "") +
-      (walk ? `<span class="label miss-label">Their best answer${walk.idea ? ", and what follows" : ""}</span><ol class="walk-steps">${rows}</ol>` +
+      (walk ? `<span class="label miss-label">${label}${walk.idea ? ", and what follows" : ""}</span><ol class="walk-steps">${rows}</ol>` +
         (walk.idea ? `<span class="walk-sum">${esc(walk.summary)}</span>` : "") : "") +
       (wait ? `<span class="walk-wait">Working out the line…</span>` : "") +
       (stats ? `<span class="miss-stats">${stats.trim()}</span>` : "") +
-      `<button type="button" class="link-btn miss-back">Try again</button>`);
+      `<button type="button" class="${onBack ? "btn primary" : "link-btn"} miss-back">${back}</button>`);
     const box = $("q-note");
     const view = (k) => {
       const st = walk.steps[k];
@@ -274,7 +274,11 @@ async function explainMiss(m, head, { reply, child, nd }) {
       paint();
     };
     box.querySelector(".walk-steps")?.addEventListener("click", (e) => { const t = e.target.closest("[data-k]"); if (t) view(+t.dataset.k); });
-    box.querySelector(".miss-back").addEventListener("click", () => { q.view = null; box.querySelectorAll(".walk-steps li").forEach((li) => li.classList.remove("on")); paint(); });
+    box.querySelector(".miss-back").addEventListener("click", () => {
+      q.view = null;
+      box.querySelectorAll(".walk-steps li").forEach((li) => li.classList.remove("on"));
+      if (onBack) onBack(); else paint();
+    });
     if (walk && first) view(0);   // show your move and their answer straight away
     else if (walk && q.view) view(Math.min(q.view.k, walk.steps.length - 1));
     first = false;
@@ -288,7 +292,7 @@ async function explainMiss(m, head, { reply, child, nd }) {
     const g = new Chess(after.fen()); g.move(replySan);
     line = await analysePv(g.fen());
   } catch {}
-  if (q.missToken !== token || q.path.length !== path.length) return;
+  if (q.missToken !== token) return;
   render(openingMiss({ path, played: m.san, reply: replySan, line }), false);
 }
 
@@ -300,7 +304,10 @@ async function accept(m, rep, loss, why = null, child = null) {
   const nd = at(book, q.path), mine = child || nd.k?.[m.san];
   const pct = (x) => (x ? `${Math.max(1, Math.round((100 * x.n) / nd.n))}%` : "");
   const prev = q.log.at(-1);
-  const reveal = prev?.cand?.kinds.includes("trap") ? ` That was a trap: most people answer <b>${esc(prev.cand.trap)}</b>, which gives away ${pawns(lossOf(prev.cand.node, prev.cand.node.k[prev.cand.trap], q.me))}.`
+  const trap = prev?.cand?.kinds.includes("trap") ? prev.cand : null;
+  const trapHead = trap ? `That was a trap: most people answer <b>${esc(trap.trap)}</b>, which gives away ${pawns(lossOf(trap.node, trap.node.k[trap.trap], q.me))}. Here's how they punish it.` : "";
+  const trapAt = trap ? { path: [...q.path], move: new Chess(q.game.fen()).move(trap.trap), node: trap.node.k[trap.trap], nd } : null;
+  const reveal = trap ? ""
     : prev?.cand?.kinds.includes("slip") ? ` Their move was a mistake (it gave away ${pawns(prev.cand.loss)}), and this punishes it.` : "";
   $("btn-show").hidden = true;
   let text;
@@ -324,7 +331,11 @@ async function accept(m, rep, loss, why = null, child = null) {
   q.marks = { [played.to]: "ok" };
   paint();
   await sleep(150);
-  step();
+  if (!trapAt) return step();
+  // A trap: stop and show it (the popular answer, crossed, and how they punish it) before the line goes on.
+  q.busy = true;
+  explainMiss(trapAt.move, `${text} ${trapHead}`, { reply: trapAt.node?.b || null, child: trapAt.node, nd: trapAt.nd },
+    { path: trapAt.path, back: "Continue", label: "How they punish it", onBack: () => { q.busy = false; q.missToken = null; note(""); step(); } });
 }
 
 function show() {
