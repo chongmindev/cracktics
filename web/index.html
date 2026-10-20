@@ -64,10 +64,6 @@
     </nav>
     </div>
     <div class="bar-right">
-      <nav class="bar-links" aria-label="Progress">
-        <button class="btn ghost" id="btn-export" type="button">Export</button>
-        <label class="btn ghost" for="file-import">Import<input class="visually-hidden" type="file" id="file-import" accept="application/json"></label>
-      </nav>
       <button class="theme-btn" id="btn-sound" type="button" aria-pressed="true" aria-label="Sound on" title="Sound on">
         <svg class="icon on" aria-hidden="true"><use href="#i-sound"/></svg>
         <svg class="icon off" aria-hidden="true"><use href="#i-mute"/></svg>
@@ -213,6 +209,8 @@
 
   <footer class="foot label">
     <span id="import-note">Runs in your browser</span>
+    <button class="foot-btn" id="btn-export" type="button" title="Download your Rewind progress, to load in another browser">Save progress</button>
+    <label class="foot-btn" for="file-import" title="Load a progress file saved in another browser">Load progress<input class="visually-hidden" type="file" id="file-import" accept="application/json"></label>
     <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener">Stockfish.js 19 lite, GPLv3</a>
     <a href="https://github.com/chongmindev/cracktics" target="_blank" rel="noopener">Source</a>
   </footer>
