@@ -3,7 +3,7 @@
 Chess training built from **your own games**. It reads your finished games, runs Stockfish over them, and
 takes you back to the positions where you went wrong:
 
-- **The drill:** the position just before one of your mistakes (a move that cost a pawn or more while the game
+- **Rewind:** the position just before one of your mistakes (a move that cost a pawn or more while the game
   was still alive). Find a move as good as the engine's. A wrong try keeps the board live; **Hint** marks the
   piece to move, **Show me** gives the answer. Then the best move's idea is stepped on the board, with what your
   game move allowed one click away.

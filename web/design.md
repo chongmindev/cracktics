@@ -129,7 +129,7 @@ interface washes, `--sq-light` / `--sq-dark` for the board, `--board-mark` for m
 | What it allowed | `.walk.why` | after the puzzle, one click ("What Nf6 allowed: Qxf7#"): my game move, their punishing reply and the engine's line, stepped like the idea, with what my move gave up |
 | The idea | `.walk` | after the puzzle: every caption shows at once; the engine's move plays, then you step with Next move or by clicking a row (no autoplay) |
 | Footer | `.foot` | full width under both columns, lined up with them, words from the left |
-| Step previews | `.how .peek` | hover or focus on Fetch / Scan / Drill shows a small looping picture of that step |
+| Step previews | `.how .peek` | hover or focus on Fetch / Scan / Rewind shows a small looping picture of that step |
 | Layout | `.main` | desktop: left and right columns share one top and one bottom, in the intro and in the drill |
 | Site picker | `#site` + `.dropdown.compact` | small dropdown left of the username; the button shows only the site's mark (Simple Icons), the list shows mark + name |
 | Status mark | `.mark` | 10px square: hollow idle, filled ready, blinking (steps, not fades) while working |
@@ -187,7 +187,7 @@ Same frame, tokens and components as the drill; extra styles in `styles/scout.cs
 |---|---|---|
 | Openings quest | `.openings-page`, `.quest` | openings/index.html, on Scout's layout: an opening select (every opening, then those White and Black choose, most played first) and a side; then counters (lines done, traps beaten, first try, streak), the opening's name, the moves so far as chips (yours in accent, a miss struck), the prompt, what they just played ("the 3rd most played (6%)"; a trap is only named after you answer), notes, **Show me**, **Next line** |
 | Game plan | `.road`, `.plan-walk` | first tab. A list of plans (costly habit, its road, "Costs N", odds), then one plan: the road as chips (your moves in accent, theirs with how often), where they can go another way, then "Why it's punishable, move by move" as `.walk-steps` rows: why their move fails, then Stockfish's line (up to 12 plies, until neither side threatens anything) with a reason per move: what it takes, the threat it answers or makes, and material as it stands. The board shows the next move as an arrow; ← → (Home / End) and the ← / Next move buttons step through road, habit and line |
-| Tools nav | `.tools` | in the bar beside the wordmark: Drill, Scout; the current page underlined in ink. Under 420px the wordmark shows only the knight |
+| Tools nav | `.tools` | in the bar beside the wordmark: Rewind, Openings, Scout; the current page underlined in ink. Under 420px the wordmark shows only the knight |
 | You'll have | `.seg` | White / Black as two joined buttons (pick one) |
 | Summary | `.scout-counters` | the inverted band: games, how often they win, how predictable, where they leave book |
 | Tabs | `.tabs` | Weak spots, Explorer, Habits; one pane at a time, scrolling inside the panel on desktop |
