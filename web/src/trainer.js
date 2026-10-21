@@ -30,11 +30,9 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 const fmt = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(1);
 /** An eval for me: "#3" (I mate in 3), "−#2" (I get mated), else "+1.2". mate: moves, my view; v: pawns, my view. */
 const fmtEval = (v, mate = null) => (mate ? (mate > 0 ? `#${mate}` : `−#${-mate}`) : fmt(v));
-/** The review boxes as columns (box 0 = not answered yet): short name, and what's in it (box n returns after
- * 3·2^(n-1) other positions, see pickNext). */
-const BOXES = [["New", "not answered yet: these come first"], ["Missed", "missed last time: back after 3 other positions"],
-  ["1×", "right once: back after 6"], ["2×", "right twice in a row: back after 12"], ["3×", "right 3 times in a row: back after 24"],
-  ["4×+", "right 4 or more times in a row: back after 48"]];
+/** The review boxes as columns (box 0 = not answered yet): short name, and what's in it, for the hover tip. */
+const BOXES = [["New", "not answered yet"], ["Missed", "missed last time"], ["1×", "right once"], ["2×", "right twice in a row"],
+  ["3×", "right 3 times in a row"], ["4×+", "right 4+ times in a row"]];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 /** "2026-10-17" -> "Oct 17, 2026" (or the text as it is, if it isn't a date). */
 const dateText = (d) => { const [y, m, day] = String(d || "").split(/[-.]/); return MONTHS[m - 1] && +day ? `${MONTHS[m - 1]} ${+day}, ${y}` : d || ""; };
@@ -566,7 +564,7 @@ export class Trainer {
     const counts = [0, 0, 0, 0, 0, 0];
     for (const it of this.items) counts[boxes[it.id] || 0]++;
     const max = Math.max(...counts, 1);
-    this.els.boxes.innerHTML = counts.map((n, i) => `<div title="${n} ${BOXES[i][1]}"><b>${n}</b><i style="height:${Math.round(2 + (18 * n) / max)}px"></i><span>${BOXES[i][0]}</span></div>`).join("");
+    this.els.boxes.innerHTML = counts.map((n, i) => `<div tabindex="0" data-tip="${n} position${n === 1 ? "" : "s"} ${BOXES[i][1]}" aria-label="${BOXES[i][0]}: ${n} position${n === 1 ? "" : "s"} ${BOXES[i][1]}"><b>${n}</b><i style="height:${Math.round(2 + (18 * n) / max)}px"></i><span>${BOXES[i][0]}</span></div>`).join("");
   }
 
   next() {
