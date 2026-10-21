@@ -473,6 +473,7 @@ async function main() {
   new ResizeObserver(fitHero).observe(document.querySelector(".stage"));
   board = new Board($("board"), $("arrows"));
   evalBar = new EvalBar($("board").parentElement, $("q-eval"));
+  board.material = $("q-mat");
   liftPieces(board.el, {
     canLift: (s) => !!q && !q.busy && q.phase === "play" && turnOf(q.path) === q.me && q.game.get(s)?.color === q.game.turn(),
     tap: (s) => onTap(s),

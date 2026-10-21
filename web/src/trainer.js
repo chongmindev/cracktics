@@ -12,6 +12,7 @@
 import { Chess } from "chess.js";
 import { liftPieces } from "./drag.js";
 import { EvalBar } from "./evalbar.js";
+import { paintMaterial } from "./material.js";
 import { material, numbered, punishment, walkthrough } from "./explain.js";
 
 export { material };
@@ -210,8 +211,7 @@ export class Trainer {
   paintMaterial() {
     const fr = this.frames[this.view];
     if (!fr) return;
-    const mat = material(fr.fen) * (this.meW() ? 1 : -1);
-    this.els.material.textContent = mat ? `Material: you ${mat > 0 ? "+" : "−"}${Math.abs(mat)}` : "Material: even";
+    paintMaterial(this.els.material, fr.fen, this.meW());
   }
 
   animate({ move, reverse, ms = SLIDE_MS }) {

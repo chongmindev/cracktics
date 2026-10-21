@@ -452,6 +452,7 @@ async function main() {
   document.fonts?.ready.then(fitHero);
   new ResizeObserver(fitHero).observe(document.querySelector(".stage"));
   board = new Board($("board"), $("arrows"));
+  board.material = $("r-mat");
   store = await openStore();
 
   const paintSite = () => {

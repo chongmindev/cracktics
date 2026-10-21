@@ -555,3 +555,13 @@ svg.arrows polygon { fill: var(--ink); }
 .eval-label { color: var(--ink-muted); }
 .eval-label b { color: var(--ink); font-weight: 600; }
 @media (max-width: 640px) { .eval-label .words { display: none; } }
+
+/* ---------- Material line (material.js): the pieces only one side has, drawn small ---------- */
+.material { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; color: var(--ink-muted); }
+.material b { color: var(--ink); font-weight: 600; }
+.mat-side { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); }
+.mat-side + .mat-side::before { content: "·"; margin-right: 4px; color: var(--ink-muted); }
+.pc.mi { display: inline-block; width: 2em; height: 2em; margin: -0.5em -0.15em; flex: none; }
+.pc.mi.same { margin-left: -1.05em; }   /* a run of the same piece overlaps, so three pawns stay short */
+#r-mat { margin: 0; }
+#r-mat:empty { display: none; }

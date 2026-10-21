@@ -2,6 +2,7 @@
 // the drill (styles/app.css), without its animations. With `onTap` the squares are buttons, for playing a move.
 
 import { Chess } from "chess.js";
+import { paintMaterial } from "./material.js";
 
 const FILES = "abcdefgh";
 const NAME = { k: "king", q: "queen", r: "rook", b: "bishop", n: "knight", p: "pawn" };
@@ -43,6 +44,7 @@ export class Board {
       }
       this.el.appendChild(d);
     }
+    paintMaterial(this.material, fen, this.white);   // the material line, if the page gave the board one
     this.arrows.innerHTML = [...arrows].sort((a, b) => a.weight - b.weight).map((a) => this.arrow(a)).join("");
   }
 
