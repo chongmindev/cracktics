@@ -193,32 +193,6 @@ async function main() {
     const timeClasses = [...document.querySelectorAll("input[name=tc]:checked")].map((b) => b.value);
     start(store, trainer, siteNow(), username, $("range").value, timeClasses);
   });
-
-  $("btn-export").addEventListener("click", async () => {
-    const username = $("username").value.trim().toLowerCase(), site = siteNow();
-    const data = { username, site, progress: await store.get(`progress|${playerKey(site, username)}`) };
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
-    a.download = `cracktics-progress-${site === "lichess" ? "lichess-" : ""}${username}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
-  $("file-import").addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-      const data = JSON.parse(await file.text());
-      const site = data.site === "lichess" ? "lichess" : "chesscom";
-      await store.set(`progress|${playerKey(site, data.username)}`, data.progress);
-      $("site").value = site;
-      siteSel.sync();
-      $("username").value = data.username;
-      paintSite();
-      $("import-note").textContent = `Progress for ${data.username} imported. Press Continue.`;
-    } catch {
-      $("import-note").textContent = "That file isn't a progress export.";
-    }
-  });
 }
 
 main();

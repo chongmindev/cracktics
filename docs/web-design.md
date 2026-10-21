@@ -67,7 +67,7 @@ no false threats). Recorded in `docs/decisions.md`.
 - `evals` keyed by (FEN, depth, MultiPV), same shape as the Python SQLite cache.
 - `archives` per username and month (past months are final).
 - `items` per username; `progress` (Leitner boxes) keyed by stable item id (same hash as Python).
-- Export/import of progress as a JSON file, so people can move between devices without a server.
+- Progress is saved automatically in each browser (IndexedDB). The export/import links were removed (2026-10-20): moving between browsers or devices needs sync, not built.
 
 ## Parity with the Python pipeline
 

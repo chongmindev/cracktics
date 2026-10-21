@@ -312,9 +312,6 @@ svg.arrows { position: absolute; inset: 0; width: 100%; height: 100%; pointer-ev
   padding: 0 var(--pad) 16px; }
 .foot::before { content: ""; flex: 0 0 100%; border-top: var(--hairline); margin-bottom: 8px; }
 .foot a { color: var(--ink-muted); border-bottom-color: var(--hairline-color); }
-.foot-btn { font: inherit; letter-spacing: inherit; text-transform: inherit; color: var(--ink-muted); background: none; border: 0;
-  border-bottom: 1px solid var(--hairline-color); padding: 0; cursor: pointer; }
-.foot-btn:hover, .foot-btn:focus-within { color: var(--ink); }
 
 /* Waiting */
 .waiting { margin: 0; display: flex; align-items: center; gap: 12px; font: italic 1.125rem var(--f-body); color: var(--ink-muted); }
