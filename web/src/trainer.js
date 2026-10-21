@@ -76,6 +76,19 @@ export class Trainer {
     this.bar = els.board.parentElement ? new EvalBar(els.board.parentElement, els.evalLabel || null) : null;
     this.evals = new Map();
     this.asked = new Set();
+    // Keyboard: ← → step through the walkthrough the board is showing (Home / End: its first and last move);
+    // N goes to the next position once there is one. Ignored while typing in a field or with a modifier held.
+    document.addEventListener("keydown", (e) => {
+      if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.("input, select, textarea, [contenteditable]")) return;
+      if (!this.cur || !this.els.drill?.offsetParent) return;
+      const s = this.stepping, k = e.key;
+      if (s && (k === "ArrowRight" || k === "ArrowLeft")) s.step(k === "ArrowRight" ? 1 : -1);
+      else if (s && k === "Home") s.first();
+      else if (s && k === "End") s.last();
+      else if ((k === "n" || k === "N") && !this.els.next.hidden) this.next();
+      else return;
+      e.preventDefault();
+    });
     this.items = [];
     this.progress = Trainer.freshProgress();
     this.cur = null;
@@ -385,14 +398,18 @@ export class Trainer {
     const rows = w.steps.map((st, k) =>
       `<li><button type="button" data-k="${k}"><b>${esc(numbered(st.ply.before, st.ply.move))}</b><span>${st.text}</span></button></li>`).join("");
     box.innerHTML = head + `<ol class="walk-steps">${rows}</ol>` + (w.idea ? `<p class="walk-sum">${esc(w.summary)}</p>` : "") +
-      (idx.length > 1 ? `<button class="btn ghost walk-step" type="button"></button>` : "");
+      (idx.length > 1 ? `<button class="btn ghost walk-step" type="button" title="Or use the arrow keys: ← →"></button>` : "");
     const step = box.querySelector(".walk-step");
     let at = 0;
     const show = (k) => {
       if (this.walkToken !== token) return;
-      at = k;
-      this.goto(idx[k]);
-      box.querySelectorAll(".walk-steps li").forEach((li, j) => li.classList.toggle("on", j === k));
+      at = Math.max(0, Math.min(idx.length - 1, k));
+      this.goto(idx[at]);
+      // One row lit across both walkthroughs: the one the board shows. The arrow keys step this one.
+      this.els.feedback.querySelectorAll(".walk-steps li.on").forEach((li) => li.classList.remove("on"));
+      box.querySelectorAll(".walk-steps li").forEach((li, j) => li.classList.toggle("on", j === at));
+      this.stepping = { step: (d) => show(at + d), first: () => show(0), last: () => show(idx.length - 1) };
+      k = at;
       if (step) step.innerHTML = k < idx.length - 1 ? `Next move <svg class="icon"><use href="#i-next"/></svg>`
         : `<svg class="icon"><use href="#i-replay"/></svg>From the start`;
     };
@@ -406,7 +423,7 @@ export class Trainer {
     const cur = this.cur, fb = this.els.feedback.querySelector(".fb");
     if (!fb || !cur.reply) return;
     fb.querySelector(".see-played")?.remove();
-    const token = this.walkToken = {};
+    const token = this.walkToken;   // this puzzle's: both walkthroughs stay live until the next one
     let mine = null, rm = null;
     try { mine = new Chess(cur.before_fen).move(cur.san); rm = new Chess(cur.fen).move(cur.reply); } catch {}
     if (!mine || !rm) return;
@@ -438,7 +455,7 @@ export class Trainer {
   async walk(cur) {
     const fb = this.els.feedback.querySelector(".fb");
     if (!fb || !cur.better || !cur.before_fen) return;
-    const token = this.walkToken = {};
+    const token = this.walkToken;   // this puzzle's: both walkthroughs stay live until the next one
     const head = `<p class="label">The idea · ${esc(num(cur.move, this.meW(), cur.better))}</p>`;
     const box = document.createElement("div");
     box.className = "walk";
@@ -460,10 +477,11 @@ export class Trainer {
       return (at = this.addFrame(ply.after, ply.move, at, "pv", numbered(ply.before, ply.move)));
     });
     const show = this.stepper(box, head, w, idx, token);
+    if (this.stepping) return;   // "What X allowed" was opened while this was worked out: leave the board to it
     if (this.view !== idx[0]) {
       this.goto(this.beforeIdx);
       await sleep(500);
-      if (this.walkToken !== token) return;
+      if (this.walkToken !== token || this.stepping) return;
     }
     show(0);
     this.showInDrill(this.els.next);
@@ -560,7 +578,8 @@ export class Trainer {
     this.step = "solve";
     this.firstTry = null;
     this.busy = false;
-    this.walkToken = null;
+    this.walkToken = {};
+    this.stepping = null;
     this.badge = null;
     this.hintSq = null;
     this.setArrows([], null);
