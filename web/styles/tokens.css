@@ -55,8 +55,13 @@
   --touch: 44px;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1023px) and (orientation: portrait), (max-width: 639px) {
   :root { --pad: 20px; --gap: 32px; }
+}
+
+/* Phone on its side: little height, so tighter margins leave more board. */
+@media (max-height: 500px) and (orientation: landscape) {
+  :root { --pad: 16px; --gap: 24px; --bar: 48px; }
 }
 
 /* Night mode: ink and paper swap; the accent lightens to keep contrast; the board goes mid-tone so both

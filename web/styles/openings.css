@@ -38,6 +38,6 @@ svg.arrows g.wrong polygon { fill: var(--ink-muted); }
 /* Next line stays in view (see the same rule for Rewind in app.css) */
 .q-actions:has(#btn-next:not([hidden])) { position: sticky; bottom: 0; z-index: 2; padding: 10px 0 12px; background: var(--paper);
   box-shadow: 0 -10px 10px -10px color-mix(in srgb, var(--ink) 35%, transparent); }
-@media (max-width: 1023px), (max-height: 699px) { .openings-page .pane { overflow: visible; } }
+@media (max-width: 1023px) and (orientation: portrait), (max-width: 639px), (max-height: 699px) { .openings-page .pane { overflow: visible; } }
 .q-eval { margin: -4px 0 0; }
 .q-eval:empty { display: none; }

@@ -54,13 +54,13 @@ a:hover { border-bottom-color: var(--accent); }
 .status-chip { display: flex; align-items: center; gap: 10px; }
 
 .main { display: grid; gap: var(--gap); padding: var(--pad); min-height: 0; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 1024px) {
+@media (min-width: 1024px), (min-width: 640px) and (orientation: landscape) {
   .main { grid-template-columns: auto minmax(360px, 1fr); max-width: 1280px; width: 100%; margin: 0 auto; }
 }
 
 /* ---------- Left: the stage (hero type, then the board) ---------- */
 .stage { position: relative; width: 100%; aspect-ratio: 1; }
-@media (min-width: 1024px) {
+@media (min-width: 1024px), (min-width: 640px) and (orientation: landscape) {
   /* As tall as the panel beside it (top and bottom line up), square, at most about half the width. */
   .stage { height: auto; align-self: start; width: min(52vw, calc(100dvh - var(--bar) - var(--foot) - 2 * var(--pad))); }
 }
@@ -341,7 +341,7 @@ body[data-view="drill"] .form:not(.open) .form-body { display: none; }
 body[data-view="drill"] .form:not(.open) .form-summary { display: flex; }
 .form-summary .who { font: 500 0.875rem var(--f-mono); }
 
-@media (max-width: 1023px) {
+@media (max-width: 1023px) and (orientation: portrait), (max-width: 639px) {
   .main { padding-top: 24px; }
   .hero { position: static; }
   .stage { aspect-ratio: auto; }
@@ -452,7 +452,7 @@ svg.arrows polygon { fill: var(--ink); }
 :root[data-theme="dark"] .theme-btn .moon { display: none; }
 
 /* ---------- Intro on desktop: the hero and the panel share one top and one bottom ---------- */
-@media (min-width: 1024px) {
+@media (min-width: 1024px), (min-width: 640px) and (orientation: landscape) {
   body[data-view="intro"] .main { align-content: center; }
   body[data-view="intro"] .stage { aspect-ratio: auto; height: auto; align-self: stretch; max-height: none;
     width: min(52vw, calc(0.9 * (100dvh - var(--bar) - var(--foot) - 2 * var(--pad)))); }
@@ -539,11 +539,11 @@ svg.arrows polygon { fill: var(--ink); }
    page scrolls, so the panel mustn't be a scroll box of its own). Explanations that load after it can't push it out. */
 .drill .btns:has(#btn-next:not([hidden])) { position: sticky; bottom: 0; z-index: 2; padding: 10px 0 12px; background: var(--paper);
   box-shadow: 0 -10px 10px -10px color-mix(in srgb, var(--ink) 35%, transparent); }
-@media (max-width: 1023px), (max-height: 699px) { .drill { overflow: visible; } }
+@media (max-width: 1023px) and (orientation: portrait), (max-width: 639px), (max-height: 699px) { .drill { overflow: visible; } }
 
 /* ---------- Eval bar (evalbar.js): a strip off the board's left edge, your colour from the bottom ---------- */
 .boardbox { --evalw: 12px; --evalgap: 8px; }
-@media (max-width: 640px) { .boardbox { --evalw: 7px; --evalgap: 5px; } }
+@media (max-width: 640px), (max-height: 500px) { .boardbox { --evalw: 7px; --evalgap: 5px; } }
 .evalbar-v { position: absolute; top: -2px; bottom: -2px; left: calc(-1 * (var(--evalw) + var(--evalgap))); width: var(--evalw);
   border: var(--thin); border-color: var(--ink); background: #1f1f1f; overflow: hidden; }
 .evalbar-v .fill { position: absolute; left: 0; right: 0; bottom: 0; height: var(--share, 50%); background: #f2f2f2;
@@ -565,3 +565,22 @@ svg.arrows polygon { fill: var(--ink); }
 .pc.mi.same { margin-left: -1.05em; }   /* a run of the same piece overlaps, so three pawns stay short */
 #r-mat { margin: 0; }
 #r-mat:empty { display: none; }
+
+/* ---------- Phones and tablets ---------- */
+/* One column (phone, iPad upright): what to do with the position comes right under the board; the numbers follow. */
+@media (max-width: 1023px) and (orientation: portrait), (max-width: 639px) {
+  body[data-view="drill"] .panel > .status, body[data-view="drill"] .panel > .counters { order: 1; }
+}
+/* Touch: small links and buttons get a finger-sized hit area without moving anything. */
+@media (pointer: coarse) {
+  .tools a, .btn.ghost, .link-btn, .foot a, .crumb, .game-link { position: relative; }
+  .tools a::after, .btn.ghost::after, .link-btn::after, .foot a::after, .crumb::after, .game-link::after {
+    content: ""; position: absolute; inset: -12px -6px; }
+  .theme-btn { width: 40px; height: 40px; }
+}
+/* Side by side but short (a phone on its side, a small laptop window): the page scrolls, so the board stays put
+   beside the panel, and the numbers go under the position. */
+@media (max-height: 699px) and (min-width: 640px) and (orientation: landscape) {
+  .stage { position: sticky; top: var(--pad); }
+  body[data-view="drill"] .panel > .status, body[data-view="drill"] .panel > .counters { order: 1; }
+}
