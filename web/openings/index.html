@@ -106,11 +106,11 @@
             </label>
           </div>
           <div class="form-row tc" style="margin-top:14px">
-            <fieldset class="seg" id="side">
-              <legend class="label">You play</legend>
+            <div class="seg" id="side" role="radiogroup" aria-labelledby="side-label">
+              <span class="label" id="side-label">You play</span>
               <label><input type="radio" name="side" value="w" checked><span>White</span></label>
               <label><input type="radio" name="side" value="b"><span>Black</span></label>
-            </fieldset>
+            </div>
             <button class="btn primary" type="submit" id="btn-go" disabled><span>Start the quest</span><svg class="icon"><use href="#i-next"/></svg></button>
           </div>
         </div>

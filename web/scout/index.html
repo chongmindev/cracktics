@@ -143,11 +143,11 @@
           </div>
           <button class="link-btn label also-add" type="button" id="btn-also">+ Their other account</button>
           <div class="form-row tc" style="margin-top:14px">
-            <fieldset class="seg" id="side">
-              <legend class="label">You'll have</legend>
+            <div class="seg" id="side" role="radiogroup" aria-labelledby="side-label">
+              <span class="label" id="side-label">You'll have</span>
               <label><input type="radio" name="side" value="w" checked><span>White</span></label>
               <label><input type="radio" name="side" value="b"><span>Black</span></label>
-            </fieldset>
+            </div>
             <fieldset class="toggles">
               <legend class="visually-hidden">Time controls</legend>
               <label class="toggle"><input type="checkbox" name="tc" value="rapid" checked><span><i class="tick" aria-hidden="true"></i>Rapid</span></label>

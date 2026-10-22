@@ -12,10 +12,10 @@
 
 /* You'll have White / Black: two joined buttons, one pressed (joined reads as pick-one) */
 .seg { display: grid; grid-template-columns: auto 1fr 1fr; align-items: center; gap: 0; margin: 0; padding: 0; border: 0; }
-.seg legend { float: left; padding: 0 14px 0 8px; }
+.seg > .label { padding: 0 14px 0 8px; }
 .seg label { cursor: pointer; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
-.seg span { display: flex; align-items: center; justify-content: center; min-height: 40px; border: var(--medium);
+.seg label span { display: flex; align-items: center; justify-content: center; min-height: 40px; border: var(--medium);
   font: 500 0.8125rem var(--f-mono); letter-spacing: var(--track-label); text-transform: uppercase; transition: background var(--t), color var(--t); }
 .seg label + label span { border-left: 0; }
 .seg label:hover span { background: var(--tint); }
