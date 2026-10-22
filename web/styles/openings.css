@@ -24,7 +24,8 @@
 .tag.seen.no { border-color: var(--accent); color: var(--accent); }
 
 /* Why your move was wrong */
-#q-note { display: grid; gap: 8px; }
+/* The step-by-step breakdown is a column of blocks; a plain sentence (with a bold move in it) stays one line of text. */
+#q-note:has(> .miss-head) { display: grid; gap: 8px; }
 .miss-why { margin: 0; padding-left: 1.1em; display: grid; gap: 2px; }
 .miss-label { margin-top: 2px; }
 #q-note .walk-steps button { font-size: 0.875rem; }
