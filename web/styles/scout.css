@@ -66,14 +66,18 @@
 .tag.slip { background: var(--accent); color: var(--paper); }
 
 /* Explorer */
-.crumbs { display: flex; flex-wrap: wrap; gap: 2px 4px; }
+/* Wrapping rows are plain text with inline blocks, not flex-wrap: Safari sizes a wrapped flex row inside these grids as
+   one line, and the second line then sits on whatever comes next. */
+.crumbs { display: block; line-height: 1.75; }
+.crumbs > * { display: inline-block; margin: 0 4px 2px 0; line-height: 1.4; }
 .crumb { border: 0; padding: 2px 4px; background: none; font: 500 0.875rem var(--f-mono); color: var(--ink-muted); cursor: pointer; }
 .crumb:hover { color: var(--ink); background: var(--tint); }
 .crumb:last-child { color: var(--ink); font-weight: 700; box-shadow: inset 0 -2px 0 var(--accent); }
 .opening { margin: 0; font: 700 1.25rem/1.2 var(--f-display); }
 .opening .label { font-family: var(--f-mono); margin-right: 6px; }
 .slip-note { margin: 0; padding: 8px 10px; border-left: 4px solid var(--accent); background: var(--tint); font-size: 0.9375rem; }
-.links { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.links { margin: 0; line-height: 1.9; }
+.links > * { display: inline-block; margin-right: 12px; line-height: 1.4; }
 
 /* Arrows: their moves in ink, yours (their opponents') in accent */
 svg.arrows g.yours line { stroke: var(--accent); }
@@ -86,7 +90,7 @@ svg.arrows g.yours polygon { fill: var(--accent); }
 
 /* Game plan: the road (your moves in accent, theirs with how often they play them), then the punishment */
 .road { display: grid; gap: 4px; }
-.road .crumb { display: inline-flex; align-items: baseline; gap: 3px; }
+.road .crumbs > .crumb { display: inline-flex; align-items: baseline; gap: 3px; }
 .road .crumb:last-child { font-weight: 500; box-shadow: none; }
 .road .crumb.yours { color: var(--accent); font-weight: 700; }
 .road .crumb.theirs { color: var(--ink); }
